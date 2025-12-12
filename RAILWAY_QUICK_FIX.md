@@ -32,9 +32,13 @@ The error you're seeing is because Railway is trying to use Railpack on the root
 3. **Set Environment Variables**:
    - Go to "Variables" tab
    - Click "Connect" → "PostgreSQL" (this auto-adds DB vars)
-   - Then add these manually:
+   - Railway will add variables like `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`
+   - Then add these Spring Boot variables:
      ```
      SPRING_PROFILES_ACTIVE=prod
+     SPRING_DATASOURCE_URL=jdbc:postgresql://${PGHOST}:${PGPORT}/${PGDATABASE}
+     SPRING_DATASOURCE_USERNAME=${PGUSER}
+     SPRING_DATASOURCE_PASSWORD=${PGPASSWORD}
      SPRING_JPA_HIBERNATE_DDL_AUTO=update
      JWT_SECRET=<generate with: openssl rand -base64 32>
      FOOTBALL_API_ENABLED=true
@@ -42,6 +46,8 @@ The error you're seeing is because Railway is trying to use Railpack on the root
      FOOTBALL_API_BASE_URL=https://api.football-data.org/v4
      FOOTBALL_API_COMPETITION_ID=2021
      ```
+   
+   **See `RAILWAY_BACKEND_SETUP.md` for detailed configuration with your PostgreSQL variables.**
 
 4. **Generate Domain**:
    - "Settings" → "Generate Domain"
