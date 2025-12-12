@@ -5,9 +5,16 @@ import { useAuth } from '../context/AuthContext';
 
 // Determine WebSocket URL based on environment
 const getWebSocketUrl = () => {
-  // In production (Docker), WebSocket is proxied through Nginx, so use relative URL
+  // If VITE_API_BASE_URL is set (Railway/production), extract base URL from it
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+  if (apiBaseUrl && apiBaseUrl.startsWith('http')) {
+    // Extract base URL (remove /api suffix if present)
+    const baseUrl = apiBaseUrl.replace(/\/api\/?$/, '');
+    return baseUrl;
+  }
+  // In production without VITE_API_BASE_URL (docker-compose), use same origin
   if (import.meta.env.PROD) {
-    return window.location.origin; // Use same origin since Nginx proxies /ws
+    return window.location.origin;
   }
   // In development, use localhost
   return import.meta.env.VITE_WS_BASE_URL || 'http://localhost:8080';

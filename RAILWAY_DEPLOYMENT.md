@@ -33,51 +33,117 @@ This guide will help you deploy the World Cup Prediction Game to Railway for fre
 
 ## Step 2: Deploy to Railway
 
+Railway doesn't support docker-compose directly. We'll deploy each service separately.
+
+### Step 2.1: Create Project and Add PostgreSQL
+
 1. **Sign in to Railway**:
    - Go to [railway.app](https://railway.app)
    - Sign in with GitHub (recommended)
 
 2. **Create a New Project**:
    - Click "New Project"
-   - Select "Deploy from GitHub repo"
-   - Choose your repository
-   - Railway will auto-detect `docker-compose.yml`
+   - Select "Empty Project"
 
 3. **Add PostgreSQL Database**:
    - In your Railway project, click "+ New"
    - Select "Database" → "Add PostgreSQL"
    - Railway will create a PostgreSQL instance
-   - **Copy the connection details** (you'll need them)
+   - Click on the PostgreSQL service → "Variables" tab
+   - **Copy these values** (you'll need them):
+     - `PGHOST` (hostname)
+     - `PGPORT` (port, usually 5432)
+     - `PGDATABASE` (database name)
+     - `PGUSER` (username)
+     - `PGPASSWORD` (password)
+   - Or copy the `DATABASE_URL` connection string
 
-4. **Configure Environment Variables**:
-   - Go to your backend service → "Variables" tab
-   - Add the following environment variables:
+### Step 2.2: Deploy Backend Service
+
+1. **Add Backend Service**:
+   - In your Railway project, click "+ New"
+   - Select "GitHub Repo"
+   - Choose your repository
+   - Railway will try to detect the service - **we need to configure it manually**
+
+2. **Configure Backend for Docker**:
+   - Click on the newly created service
+   - Go to "Settings" tab
+   - Under "Build Command", leave it empty (Docker handles this)
+   - Under "Root Directory", set to: `backend`
+   - Under "Dockerfile Path", set to: `Dockerfile` (it's in the backend folder)
+   - Railway should detect it's a Dockerfile build
+
+3. **Set Backend Environment Variables**:
+   - Go to "Variables" tab
+   - Add these variables (use the PostgreSQL values from Step 2.1):
 
    ```
    SPRING_PROFILES_ACTIVE=prod
-   SPRING_DATASOURCE_URL=<PostgreSQL URL from Railway>
-   SPRING_DATASOURCE_USERNAME=<PostgreSQL username>
-   SPRING_DATASOURCE_PASSWORD=<PostgreSQL password>
+   SPRING_DATASOURCE_URL=jdbc:postgresql://PGHOST:PGPORT/PGDATABASE
+   SPRING_DATASOURCE_USERNAME=PGUSER
+   SPRING_DATASOURCE_PASSWORD=PGPASSWORD
    SPRING_JPA_HIBERNATE_DDL_AUTO=update
    JWT_SECRET=<Generate a secure random string>
-   CORS_ALLOWED_ORIGINS=https://your-frontend.railway.app
    FOOTBALL_API_ENABLED=true
    FOOTBALL_API_KEY=<Your Football-Data.org API key>
    FOOTBALL_API_BASE_URL=https://api.football-data.org/v4
    FOOTBALL_API_COMPETITION_ID=2021
    ```
    
-   **Important**: Replace `https://your-frontend.railway.app` with your actual frontend Railway domain (you'll get this after deploying the frontend).
-
+   **Important**: Replace `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` with the actual values from your PostgreSQL service.
+   
    **To generate JWT_SECRET**:
    ```bash
    openssl rand -base64 32
    ```
 
-5. **Update docker-compose.yml for Railway**:
-   Railway will automatically use your `docker-compose.yml`, but you may need to:
-   - Remove the `postgres` service (Railway provides its own)
-   - Update the `SPRING_DATASOURCE_URL` to use Railway's PostgreSQL
+4. **Link PostgreSQL to Backend**:
+   - In the backend service, go to "Settings" → "Connect" → "PostgreSQL"
+   - This will automatically add the database connection variables
+
+5. **Generate Backend Domain**:
+   - Go to backend service → "Settings" → "Generate Domain"
+   - Copy the domain (e.g., `https://your-backend.railway.app`)
+
+### Step 2.3: Deploy Frontend Service
+
+1. **Add Frontend Service**:
+   - In your Railway project, click "+ New"
+   - Select "GitHub Repo"
+   - Choose the same repository
+   - Railway will create a new service
+
+2. **Configure Frontend for Docker**:
+   - Click on the frontend service
+   - Go to "Settings" tab
+   - Under "Root Directory", set to: `frontend`
+   - Under "Dockerfile Path", set to: `Dockerfile` (it's in the frontend folder)
+
+3. **Set Frontend Environment Variables**:
+   - Go to "Variables" tab
+   - Add this variable (use your backend domain from Step 2.2):
+
+   ```
+   VITE_API_BASE_URL=https://your-backend.railway.app/api
+   VITE_WS_BASE_URL=https://your-backend.railway.app
+   ```
+   
+   **Important**: Replace `https://your-backend.railway.app` with your actual backend Railway domain.
+   
+   **Note**: The frontend needs to know the backend URL at build time, so make sure to set these before Railway builds the frontend.
+
+4. **Generate Frontend Domain**:
+   - Go to frontend service → "Settings" → "Generate Domain"
+   - Copy the domain (e.g., `https://your-frontend.railway.app`)
+
+5. **Update Backend CORS**:
+   - Go back to backend service → "Variables"
+   - Add or update:
+   ```
+   CORS_ALLOWED_ORIGINS=https://your-frontend.railway.app
+   ```
+   - Replace with your actual frontend domain
 
    **Alternative**: Railway can deploy services individually. You can:
    - Deploy backend as one service

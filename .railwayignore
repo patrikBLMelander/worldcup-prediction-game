@@ -1,0 +1,22 @@
+# Railway ignore file - similar to .gitignore
+# Files Railway doesn't need for deployment
+
+# Documentation
+*.md
+!README.md
+
+# Docker files (we use Dockerfiles in subdirectories)
+docker-compose.yml
+start-docker.sh
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Git
+.git/
+.gitignore
+
