@@ -1,0 +1,83 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: worldcup-postgres
+    environment:
+      POSTGRES_DB: worldcupdb
+      POSTGRES_USER: worldcup
+      POSTGRES_PASSWORD: worldcup123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U worldcup"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - worldcup-network
+
+  # Spring Boot Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: worldcup-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/worldcupdb
+      SPRING_DATASOURCE_USERNAME: worldcup
+      SPRING_DATASOURCE_PASSWORD: worldcup123
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-key-in-production}
+      JWT_EXPIRATION: 86400000
+      FOOTBALL_API_ENABLED: ${FOOTBALL_API_ENABLED:-true}
+      FOOTBALL_API_KEY: ${FOOTBALL_API_KEY:-}
+      FOOTBALL_API_BASE_URL: ${FOOTBALL_API_BASE_URL:-https://api.football-data.org/v4}
+      FOOTBALL_API_COMPETITION_ID: ${FOOTBALL_API_COMPETITION_ID:-2021}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - worldcup-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: worldcup-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - worldcup-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  worldcup-network:
+    driver: bridge
+

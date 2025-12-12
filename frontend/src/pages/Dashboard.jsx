@@ -1,0 +1,129 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import apiClient from '../config/api';
+import Navigation from '../components/Navigation';
+import './Dashboard.css';
+
+const Dashboard = () => {
+  const { user, updateUser } = useAuth();
+  const [stats, setStats] = useState({
+    totalMatches: 0,
+    scheduledMatches: 0,
+    myPredictions: 0,
+    leaderboardPosition: 0,
+  });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user?.id) return; // Don't fetch if user is not loaded yet
+
+    const fetchStats = async () => {
+      try {
+        // Fetch matches
+        const matchesResponse = await apiClient.get('/matches');
+        const allMatches = matchesResponse.data;
+        const scheduledMatches = allMatches.filter(m => m.status === 'SCHEDULED');
+
+        // Fetch my predictions
+        const predictionsResponse = await apiClient.get('/predictions/my-predictions');
+        const myPredictions = predictionsResponse.data;
+
+        // Fetch leaderboard to find position
+        const leaderboardResponse = await apiClient.get('/users/leaderboard');
+        const leaderboard = leaderboardResponse.data;
+        const position = leaderboard.findIndex(u => u.userId === user.id) + 1;
+
+        setStats({
+          totalMatches: allMatches.length,
+          scheduledMatches: scheduledMatches.length,
+          myPredictions: myPredictions.length,
+          leaderboardPosition: position || leaderboard.length + 1,
+        });
+
+        // Update user to get latest points (only once, not in dependency)
+        await updateUser();
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]); // Only depend on user.id, not the whole user object or updateUser
+
+  if (loading) {
+    return (
+      <>
+        <Navigation />
+        <div className="dashboard-loading">Loading...</div>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Navigation />
+      <div className="dashboard-container">
+        <div className="dashboard-header">
+          <h1>Welcome back, {user?.screenName || user?.email}!</h1>
+          <p className="dashboard-subtitle">World Cup 2026 Prediction Game</p>
+        </div>
+
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-icon">🏆</div>
+            <div className="stat-content">
+              <h3>{user?.totalPoints || 0}</h3>
+              <p>Total Points</p>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon">🥇</div>
+            <div className="stat-content">
+              <h3>#{stats.leaderboardPosition}</h3>
+              <p>Leaderboard Position</p>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon">🎯</div>
+            <div className="stat-content">
+              <h3>{stats.myPredictions}</h3>
+              <p>My Predictions</p>
+            </div>
+          </div>
+
+          <div className="stat-card">
+            <div className="stat-icon">⚽</div>
+            <div className="stat-content">
+              <h3>{stats.scheduledMatches}</h3>
+              <p>Scheduled Matches</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="dashboard-actions">
+          <Link to="/matches" className="action-card">
+            <h3>View Matches</h3>
+            <p>See all upcoming matches and make predictions</p>
+            <span className="action-arrow">→</span>
+          </Link>
+
+
+          <Link to="/leaderboard" className="action-card">
+            <h3>Leaderboard</h3>
+            <p>See how you rank against other players</p>
+            <span className="action-arrow">→</span>
+          </Link>
+        </div>
+      </div>
+    </>
+  );
+};
+
+export default Dashboard;
+
