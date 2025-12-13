@@ -16,6 +16,7 @@ const Matches = () => {
   const [groupFilter, setGroupFilter] = useState('ALL');
   const [sortBy, setSortBy] = useState('date'); // 'date', 'group', 'status', 'team'
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc', 'desc'
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [userPredictions, setUserPredictions] = useState({});
   const [predictionInputs, setPredictionInputs] = useState({});
@@ -333,68 +334,77 @@ const Matches = () => {
           <p>View all matches and make your predictions</p>
         </div>
 
-        <div className="matches-filters">
-          <div className="filter-group">
-            <label htmlFor="search-filter">Search Teams:</label>
-            <input
-              type="text"
-              id="search-filter"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by team name..."
-              className="search-input"
-            />
-          </div>
-          <div className="filter-group">
-            <label htmlFor="status-filter">Status:</label>
-            <select
-              id="status-filter"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option value="ALL">All</option>
-              <option value="SCHEDULED">Scheduled</option>
-              <option value="LIVE">Live</option>
-              <option value="FINISHED">Finished</option>
-              <option value="CANCELLED">Cancelled</option>
-            </select>
-          </div>
+        <div className="matches-filters-wrapper">
+          <button 
+            className="filters-toggle"
+            onClick={() => setFiltersExpanded(!filtersExpanded)}
+            aria-expanded={filtersExpanded}
+          >
+            {filtersExpanded ? '▼' : '▶'} Filters
+          </button>
+          <div className={`matches-filters ${filtersExpanded ? 'expanded' : ''}`}>
+            <div className="filter-group">
+              <label htmlFor="search-filter">Search Teams:</label>
+              <input
+                type="text"
+                id="search-filter"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search by team name..."
+                className="search-input"
+              />
+            </div>
+            <div className="filter-group">
+              <label htmlFor="status-filter">Status:</label>
+              <select
+                id="status-filter"
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+              >
+                <option value="ALL">All</option>
+                <option value="SCHEDULED">Scheduled</option>
+                <option value="LIVE">Live</option>
+                <option value="FINISHED">Finished</option>
+                <option value="CANCELLED">Cancelled</option>
+              </select>
+            </div>
 
-          <div className="filter-group">
-            <label htmlFor="group-filter">Group/Stage:</label>
-            <select
-              id="group-filter"
-              value={groupFilter}
-              onChange={(e) => setGroupFilter(e.target.value)}
-            >
-              {uniqueGroups.map(group => (
-                <option key={group} value={group}>{group}</option>
-              ))}
-            </select>
-          </div>
-          <div className="filter-group">
-            <label htmlFor="sort-by">Sort By:</label>
-            <select
-              id="sort-by"
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-            >
-              <option value="date">Date</option>
-              <option value="group">Group</option>
-              <option value="status">Status</option>
-              <option value="team">Team Name</option>
-            </select>
-          </div>
-          <div className="filter-group">
-            <label htmlFor="sort-order">Order:</label>
-            <select
-              id="sort-order"
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value)}
-            >
-              <option value="asc">Ascending</option>
-              <option value="desc">Descending</option>
-            </select>
+            <div className="filter-group">
+              <label htmlFor="group-filter">Group/Stage:</label>
+              <select
+                id="group-filter"
+                value={groupFilter}
+                onChange={(e) => setGroupFilter(e.target.value)}
+              >
+                {uniqueGroups.map(group => (
+                  <option key={group} value={group}>{group}</option>
+                ))}
+              </select>
+            </div>
+            <div className="filter-group">
+              <label htmlFor="sort-by">Sort By:</label>
+              <select
+                id="sort-by"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+              >
+                <option value="date">Date</option>
+                <option value="group">Group</option>
+                <option value="status">Status</option>
+                <option value="team">Team Name</option>
+              </select>
+            </div>
+            <div className="filter-group">
+              <label htmlFor="sort-order">Order:</label>
+              <select
+                id="sort-order"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+              >
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -410,8 +420,9 @@ const Matches = () => {
           <div className="matches-grid">
             {filteredMatches.map(match => {
               const prediction = userPredictions[match.id];
-              const homeFlagUrl = getFlagUrl(match.homeTeam);
-              const awayFlagUrl = getFlagUrl(match.awayTeam);
+              // Use team crest/logo if available, otherwise fallback to flag
+              const homeLogoUrl = match.homeTeamCrest || getFlagUrl(match.homeTeam);
+              const awayLogoUrl = match.awayTeamCrest || getFlagUrl(match.awayTeam);
               return (
                 <div key={match.id} className="match-card">
                   <div className="match-header">
@@ -422,7 +433,12 @@ const Matches = () => {
                   <div className="match-teams">
                     <div className="team">
                       <div className="team-name">
-                        <img src={homeFlagUrl} alt={match.homeTeam} className="team-flag" />
+                        <img src={homeLogoUrl} alt={match.homeTeam} className="team-logo" onError={(e) => {
+                          // Fallback to flag if logo fails to load
+                          if (match.homeTeamCrest) {
+                            e.target.src = getFlagUrl(match.homeTeam);
+                          }
+                        }} />
                         <span>{match.homeTeam}</span>
                       </div>
                       {(match.status === 'FINISHED' || match.status === 'LIVE') && (
@@ -447,7 +463,12 @@ const Matches = () => {
                     
                     <div className="team">
                       <div className="team-name">
-                        <img src={awayFlagUrl} alt={match.awayTeam} className="team-flag" />
+                        <img src={awayLogoUrl} alt={match.awayTeam} className="team-logo" onError={(e) => {
+                          // Fallback to flag if logo fails to load
+                          if (match.awayTeamCrest) {
+                            e.target.src = getFlagUrl(match.awayTeam);
+                          }
+                        }} />
                         <span>{match.awayTeam}</span>
                       </div>
                       {(match.status === 'FINISHED' || match.status === 'LIVE') && (

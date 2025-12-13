@@ -51,24 +51,16 @@ const Register = () => {
   useEffect(() => {
     // Only check after successful registration (when user is loaded and we're not loading)
     if (registerSuccess && user && !loading && !hasNavigated) {
-      console.log('Register useEffect triggered - user:', user, 'screenName:', user.screenName);
       if (!user.screenName || user.screenName === null) {
         // User has no screen name - show modal
-        console.log('Setting showScreenNameModal to true');
         setShowScreenNameModal(true);
       } else {
         // User has screen name - navigate to dashboard
-        console.log('User has screen name, navigating to dashboard');
         setHasNavigated(true);
         navigate('/dashboard');
       }
     }
   }, [user, loading, navigate, hasNavigated, registerSuccess]);
-
-  // Debug: Log modal state changes
-  useEffect(() => {
-    console.log('Register component - showScreenNameModal:', showScreenNameModal, 'user:', user, 'user.screenName:', user?.screenName);
-  }, [showScreenNameModal, user]);
 
   const handleScreenNameSave = async (screenName) => {
     await updateScreenName(screenName);

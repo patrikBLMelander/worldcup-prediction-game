@@ -13,13 +13,17 @@ After connecting PostgreSQL to your backend service, Railway will automatically 
 
 ## Step-by-Step Backend Configuration
 
-1. **In your Backend Service → Variables tab**, add these variables:
+**The Issue:** Railway's template variables `${PGHOST}` don't work in Spring Boot. We need to use Railway's reference syntax or direct values.
+
+### Option 1: Use Railway's Reference Syntax (Recommended)
+
+1. **In your Backend Service → Variables tab**, after connecting PostgreSQL, add these variables:
 
 ```
 SPRING_PROFILES_ACTIVE=prod
-SPRING_DATASOURCE_URL=jdbc:postgresql://${PGHOST}:${PGPORT}/${PGDATABASE}
-SPRING_DATASOURCE_USERNAME=${PGUSER}
-SPRING_DATASOURCE_PASSWORD=${PGPASSWORD}
+SPRING_DATASOURCE_URL=jdbc:postgresql://${{Postgres.PGHOST}}:${{Postgres.PGPORT}}/${{Postgres.PGDATABASE}}
+SPRING_DATASOURCE_USERNAME=${{Postgres.PGUSER}}
+SPRING_DATASOURCE_PASSWORD=${{Postgres.PGPASSWORD}}
 SPRING_JPA_HIBERNATE_DDL_AUTO=update
 JWT_SECRET=OuCTQN1DdoYy8y0+L3VGDhEW6fJpa+e1ErMX3P/Viy8=
 FOOTBALL_API_ENABLED=true
@@ -28,18 +32,15 @@ FOOTBALL_API_BASE_URL=https://api.football-data.org/v4
 FOOTBALL_API_COMPETITION_ID=2021
 ```
 
-**Important Notes:**
-- Railway will automatically replace `${PGHOST}`, `${PGPORT}`, etc. with actual values
-- The `JWT_SECRET` above is a generated secure key (you can regenerate if needed)
-- The `FOOTBALL_API_KEY` is your existing key
+**Note:** Railway uses `${{ServiceName.VariableName}}` syntax. Replace `Postgres` with your actual PostgreSQL service name if different.
 
-## Alternative: Use Direct Values (if template variables don't work)
+### Option 2: Use Direct Values (If Option 1 doesn't work)
 
-If Railway's template variables don't work, you can use the actual values from your PostgreSQL service:
+If Railway's reference syntax doesn't work, use the actual values from your PostgreSQL service. Go to your PostgreSQL service → Variables tab and copy the actual values:
 
 ```
 SPRING_PROFILES_ACTIVE=prod
-SPRING_DATASOURCE_URL=jdbc:postgresql://${RAILWAY_PRIVATE_DOMAIN}:5432/railway
+SPRING_DATASOURCE_URL=jdbc:postgresql://<RAILWAY_PRIVATE_DOMAIN_VALUE>:5432/railway
 SPRING_DATASOURCE_USERNAME=postgres
 SPRING_DATASOURCE_PASSWORD=wSSnKNPFEfUAcxLCBKHCyGwXeXwWtcHM
 SPRING_JPA_HIBERNATE_DDL_AUTO=update
@@ -50,7 +51,10 @@ FOOTBALL_API_BASE_URL=https://api.football-data.org/v4
 FOOTBALL_API_COMPETITION_ID=2021
 ```
 
-**Note:** Replace `${RAILWAY_PRIVATE_DOMAIN}` with the actual private domain value from your PostgreSQL service variables.
+**To find RAILWAY_PRIVATE_DOMAIN:**
+- Go to your PostgreSQL service → Variables tab
+- Look for `PGHOST` or `RAILWAY_PRIVATE_DOMAIN`
+- Copy the actual value (it will be something like `postgres.railway.internal` or similar)
 
 ## Verify Connection
 

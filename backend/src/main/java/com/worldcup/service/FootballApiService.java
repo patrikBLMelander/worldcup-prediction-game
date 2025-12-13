@@ -124,8 +124,16 @@ public class FootballApiService {
     public Match convertToMatch(MatchData apiMatch) {
         Match match = new Match();
         match.setExternalApiId(String.valueOf(apiMatch.id));
-        match.setHomeTeam(apiMatch.homeTeam.name);
-        match.setAwayTeam(apiMatch.awayTeam.name);
+        
+        if (apiMatch.homeTeam != null) {
+            match.setHomeTeam(apiMatch.homeTeam.name);
+            match.setHomeTeamCrest(apiMatch.homeTeam.crest);
+        }
+        
+        if (apiMatch.awayTeam != null) {
+            match.setAwayTeam(apiMatch.awayTeam.name);
+            match.setAwayTeamCrest(apiMatch.awayTeam.crest);
+        }
         
         // Convert UTC date to LocalDateTime
         if (apiMatch.utcDate != null) {
@@ -178,6 +186,14 @@ public class FootballApiService {
             }
         }
         
+        // Update team crests if available
+        if (apiMatch.homeTeam != null && apiMatch.homeTeam.crest != null) {
+            existingMatch.setHomeTeamCrest(apiMatch.homeTeam.crest);
+        }
+        if (apiMatch.awayTeam != null && apiMatch.awayTeam.crest != null) {
+            existingMatch.setAwayTeamCrest(apiMatch.awayTeam.crest);
+        }
+        
         // Update scores
         if (apiMatch.score != null) {
             if (apiMatch.score.fullTime != null) {
@@ -221,6 +237,7 @@ public class FootballApiService {
     public static class TeamData {
         private String name;
         private String shortName;
+        private String crest; // Team logo/crest URL from API
     }
 
     @Data

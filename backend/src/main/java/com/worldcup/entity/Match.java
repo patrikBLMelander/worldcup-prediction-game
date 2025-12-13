@@ -29,9 +29,15 @@ public class Match {
     @Column(nullable = false, length = 100)
     private String homeTeam;
 
+    @Column(length = 500)
+    private String homeTeamCrest; // Team logo/crest URL
+
     @NotBlank
     @Column(nullable = false, length = 100)
     private String awayTeam;
+
+    @Column(length = 500)
+    private String awayTeamCrest; // Team logo/crest URL
 
     @NotNull
     @Column(nullable = false)

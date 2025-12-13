@@ -135,7 +135,9 @@ public class MatchController {
         return new MatchDTO(
                 match.getId(),
                 match.getHomeTeam(),
+                match.getHomeTeamCrest(),
                 match.getAwayTeam(),
+                match.getAwayTeamCrest(),
                 match.getMatchDate(),
                 match.getVenue(),
                 match.getGroup(),

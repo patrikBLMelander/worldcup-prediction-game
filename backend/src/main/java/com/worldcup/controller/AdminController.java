@@ -9,6 +9,7 @@ import com.worldcup.entity.Role;
 import com.worldcup.entity.User;
 import com.worldcup.repository.UserRepository;
 import com.worldcup.security.AdminRequired;
+import com.worldcup.config.FootballApiSyncScheduler;
 import com.worldcup.service.MatchService;
 import com.worldcup.service.PredictionService;
 import com.worldcup.service.WebSocketService;
@@ -32,6 +33,7 @@ public class AdminController {
     private final UserRepository userRepository;
     private final PredictionService predictionService;
     private final WebSocketService webSocketService;
+    private final FootballApiSyncScheduler footballApiSyncScheduler;
 
     @GetMapping("/users")
     public ResponseEntity<List<UserInfoDTO>> getAllUsers() {
@@ -136,11 +138,24 @@ public class AdminController {
         return ResponseEntity.ok().body(java.util.Map.of("message", "Match deleted successfully"));
     }
 
+    @PostMapping("/sync/fixtures")
+    public ResponseEntity<?> triggerFixtureSync() {
+        try {
+            footballApiSyncScheduler.syncFixturesInternal();
+            return ResponseEntity.ok().body(java.util.Map.of("message", "Fixture sync triggered successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(java.util.Map.of("error", "Failed to trigger sync: " + e.getMessage()));
+        }
+    }
+
     private MatchDTO convertToDTO(Match match) {
         return new MatchDTO(
                 match.getId(),
                 match.getHomeTeam(),
+                match.getHomeTeamCrest(),
                 match.getAwayTeam(),
+                match.getAwayTeamCrest(),
                 match.getMatchDate(),
                 match.getVenue(),
                 match.getGroup(),

@@ -13,7 +13,9 @@ import java.time.LocalDateTime;
 public class MatchDTO {
     private Long id;
     private String homeTeam;
+    private String homeTeamCrest; // Team logo/crest URL
     private String awayTeam;
+    private String awayTeamCrest; // Team logo/crest URL
     private LocalDateTime matchDate;
     private String venue;
     private String group;

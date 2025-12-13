@@ -46,8 +46,6 @@ export const useWebSocket = (onMatchUpdate) => {
       heartbeatIncoming: 4000,
       heartbeatOutgoing: 4000,
       onConnect: () => {
-        console.log('WebSocket connected');
-        
         // Subscribe to match updates
         stompClient.subscribe('/topic/matches/update', (message) => {
           try {
@@ -79,7 +77,7 @@ export const useWebSocket = (onMatchUpdate) => {
         console.error('WebSocket error:', error);
       },
       onDisconnect: () => {
-        console.log('WebSocket disconnected');
+        // WebSocket disconnected
       },
     });
 

@@ -23,7 +23,9 @@ public class WebSocketService {
         MatchDTO dto = new MatchDTO();
         dto.setId(match.getId());
         dto.setHomeTeam(match.getHomeTeam());
+        dto.setHomeTeamCrest(match.getHomeTeamCrest());
         dto.setAwayTeam(match.getAwayTeam());
+        dto.setAwayTeamCrest(match.getAwayTeamCrest());
         dto.setMatchDate(match.getMatchDate());
         dto.setVenue(match.getVenue());
         dto.setGroup(match.getGroup());

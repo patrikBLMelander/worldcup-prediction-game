@@ -43,6 +43,14 @@ public class FootballApiSyncScheduler {
     @Scheduled(fixedRate = 3600000) // Every hour
     @Transactional
     public void syncFixtures() {
+        syncFixturesInternal();
+    }
+
+    /**
+     * Internal method that can be called manually
+     */
+    @Transactional
+    public void syncFixturesInternal() {
         if (!apiEnabled) {
             return;
         }
