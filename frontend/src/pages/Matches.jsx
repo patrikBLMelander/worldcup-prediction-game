@@ -235,18 +235,21 @@ const Matches = () => {
 
       // Get the other field value from updated state
       const currentInputs = updated[matchId] || {};
-      const homeScore = field === 'homeScore' ? value : (currentInputs.homeScore || '');
-      const awayScore = field === 'awayScore' ? value : (currentInputs.awayScore || '');
+      const homeScore = field === 'homeScore' ? value : (currentInputs.homeScore ?? '');
+      const awayScore = field === 'awayScore' ? value : (currentInputs.awayScore ?? '');
 
-      // Only save if both fields have valid values
-      const home = parseInt(homeScore, 10);
-      const away = parseInt(awayScore, 10);
-      
-      if (!isNaN(home) && !isNaN(away) && home >= 0 && away >= 0) {
-        // Debounce: wait 800ms after user stops typing
-        debounceTimers.current[matchId] = setTimeout(() => {
-          savePrediction(matchId, homeScore, awayScore);
-        }, 800);
+      // Only save if both fields have valid numeric values (not empty strings)
+      // Empty string means no prediction yet, so don't save
+      if (homeScore !== '' && awayScore !== '') {
+        const home = parseInt(homeScore, 10);
+        const away = parseInt(awayScore, 10);
+        
+        if (!isNaN(home) && !isNaN(away) && home >= 0 && away >= 0) {
+          // Debounce: wait 800ms after user stops typing
+          debounceTimers.current[matchId] = setTimeout(() => {
+            savePrediction(matchId, homeScore, awayScore);
+          }, 800);
+        }
       }
 
       return updated;
@@ -451,9 +454,9 @@ const Matches = () => {
                             min="0"
                             max="20"
                             className="prediction-input"
-                            value={predictionInputs[match.id]?.homeScore || ''}
+                            value={predictionInputs[match.id]?.homeScore ?? ''}
                             onChange={(e) => handlePredictionChange(match.id, 'homeScore', e.target.value)}
-                            placeholder="0"
+                            placeholder="-"
                           />
                         </div>
                       )}
@@ -481,9 +484,9 @@ const Matches = () => {
                             min="0"
                             max="20"
                             className="prediction-input"
-                            value={predictionInputs[match.id]?.awayScore || ''}
+                            value={predictionInputs[match.id]?.awayScore ?? ''}
                             onChange={(e) => handlePredictionChange(match.id, 'awayScore', e.target.value)}
-                            placeholder="0"
+                            placeholder="-"
                           />
                         </div>
                       )}
