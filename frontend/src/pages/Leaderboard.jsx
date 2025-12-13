@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../config/api';
 import Navigation from '../components/Navigation';
@@ -6,6 +7,7 @@ import './Leaderboard.css';
 
 const Leaderboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [userPosition, setUserPosition] = useState(null);
@@ -100,7 +102,16 @@ const Leaderboard = () => {
               return (
                 <div
                   key={entry.userId}
-                  className={`leaderboard-row ${getRankClass(position)} ${isCurrentUser ? 'current-user' : ''}`}
+                  className={`leaderboard-row ${getRankClass(position)} ${isCurrentUser ? 'current-user' : ''} clickable`}
+                  onClick={() => navigate(`/user/${entry.userId}`)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      navigate(`/user/${entry.userId}`);
+                    }
+                  }}
                 >
                   <div className="rank-col">
                     <span className="mobile-label">Rank:</span>

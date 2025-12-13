@@ -444,9 +444,11 @@ const Matches = () => {
                         }} />
                         <span>{match.homeTeam}</span>
                       </div>
-                      {(match.status === 'FINISHED' || match.status === 'LIVE') && (
+                      {/* Show live/actual score if available */}
+                      {(match.status === 'FINISHED' || match.status === 'LIVE') && match.homeScore !== null && (
                         <div className="team-score">{match.homeScore}</div>
                       )}
+                      {/* Show prediction input only if match is scheduled and not yet locked */}
                       {match.status === 'SCHEDULED' && new Date(match.matchDate) > new Date() && (
                         <div className="prediction-input-wrapper">
                           <input
@@ -474,9 +476,11 @@ const Matches = () => {
                         }} />
                         <span>{match.awayTeam}</span>
                       </div>
-                      {(match.status === 'FINISHED' || match.status === 'LIVE') && (
+                      {/* Show live/actual score if available */}
+                      {(match.status === 'FINISHED' || match.status === 'LIVE') && match.awayScore !== null && (
                         <div className="team-score">{match.awayScore}</div>
                       )}
+                      {/* Show prediction input only if match is scheduled and not yet locked */}
                       {match.status === 'SCHEDULED' && new Date(match.matchDate) > new Date() && (
                         <div className="prediction-input-wrapper">
                           <input
@@ -506,7 +510,19 @@ const Matches = () => {
                     </div>
                   </div>
 
-                  {/* Countdown timer at bottom center */}
+                  {/* Show prediction between date and live score */}
+                  {((match.status === 'SCHEDULED' && new Date(match.matchDate) <= new Date()) || match.status === 'LIVE' || match.status === 'FINISHED') && (
+                    <div className="prediction-summary">
+                      <span className="prediction-summary-label">Your Prediction:</span>
+                      <span className="prediction-summary-score">
+                        {prediction && prediction.homeScore !== undefined && prediction.awayScore !== undefined
+                          ? `${prediction.homeScore} - ${prediction.awayScore}`
+                          : 'No prediction'}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Countdown timer at bottom center - show for scheduled matches */}
                   {match.status === 'SCHEDULED' && (
                     <div className="countdown-wrapper-bottom">
                       <CountdownTimer 
@@ -518,8 +534,8 @@ const Matches = () => {
                     </div>
                   )}
 
-                  {/* Prediction status for scheduled matches */}
-                  {match.status === 'SCHEDULED' && (
+                  {/* Prediction status for scheduled matches (only when not locked) */}
+                  {match.status === 'SCHEDULED' && new Date(match.matchDate) > new Date() && (
                     <div className="match-actions">
                       {savingStates[match.id] === 'saving' && (
                         <span className="prediction-status saving">💾 Saving...</span>
@@ -536,12 +552,14 @@ const Matches = () => {
                     </div>
                   )}
                   
-                  {/* Locked message for live matches */}
-                  {match.status === 'LIVE' && (
+                  {/* Locked message for locked or live matches */}
+                  {(match.status === 'SCHEDULED' && new Date(match.matchDate) <= new Date()) || match.status === 'LIVE' ? (
                     <div className="match-actions">
-                      <span className="prediction-status locked">🔒 Predictions locked - Match is LIVE</span>
+                      <span className="prediction-status locked">
+                        {match.status === 'LIVE' ? '🔒 Predictions locked - Match is LIVE' : '🔒 Predictions locked'}
+                      </span>
                     </div>
-                  )}
+                  ) : null}
 
                   {/* Results summary for finished matches */}
                   {match.status === 'FINISHED' && (

@@ -106,6 +106,10 @@
   transform: translateX(4px);
 }
 
+.leaderboard-row.clickable {
+  cursor: pointer;
+}
+
 .leaderboard-row:hover::before {
   transform: scaleY(1);
 }

@@ -67,10 +67,10 @@ const CountdownTimer = ({ matchDate, status, matchId, onExpired }) => {
   }
 
   if (timeLeft.expired) {
-    // Show a more informative message with elapsed time
+    // Show locked message when countdown expires (before match actually starts)
     return (
-      <span className="countdown-timer expired">
-        Match starting{expiredSeconds > 0 ? ` (${expiredSeconds}s)` : ''}...
+      <span className="countdown-timer locked">
+        🔒 Locked
       </span>
     );
   }

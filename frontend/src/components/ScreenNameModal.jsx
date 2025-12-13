@@ -13,6 +13,33 @@ const ScreenNameModal = ({ isOpen, onClose, onSave, currentScreenName }) => {
     }
   }, [currentScreenName]);
 
+  // Prevent body scroll when modal is open and scroll to top
+  useEffect(() => {
+    if (isOpen) {
+      // Scroll to top of page
+      window.scrollTo(0, 0);
+      
+      // Save current scroll position
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+      
+      return () => {
+        // Restore scroll position
+        const scrollY = document.body.style.top;
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        document.body.style.overflow = '';
+        if (scrollY) {
+          window.scrollTo(0, parseInt(scrollY || '0') * -1);
+        }
+      };
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e) => {

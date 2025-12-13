@@ -14,6 +14,7 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     List<Match> findByMatchDateBetween(LocalDateTime start, LocalDateTime end);
     List<Match> findByGroup(String group);
     List<Match> findByStatusOrderByMatchDateAsc(MatchStatus status);
+    List<Match> findByStatusAndMatchDateAfter(MatchStatus status, LocalDateTime date);
 }
 
 

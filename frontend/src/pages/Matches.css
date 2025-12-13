@@ -272,6 +272,32 @@
   -moz-appearance: textfield;
 }
 
+.prediction-summary {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-md) 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--surface-elevated);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+}
+
+.prediction-summary-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.prediction-summary-score {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
 .match-vs {
   font-size: 1rem;
   color: var(--text-tertiary);
@@ -326,9 +352,11 @@
   animation: pulse 1s infinite;
 }
 
-.countdown-timer.expired {
-  background: var(--error);
-  animation: pulse 1s infinite;
+.countdown-timer.locked {
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  border: 2px solid var(--border);
+  animation: none;
 }
 
 @keyframes pulse {

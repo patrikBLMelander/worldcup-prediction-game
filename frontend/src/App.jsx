@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Matches from './pages/Matches';
 import Leaderboard from './pages/Leaderboard';
 import Profile from './pages/Profile';
+import PublicProfile from './pages/PublicProfile';
 import Admin from './pages/Admin';
 import './App.css';
 
@@ -74,6 +75,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Profile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user/:userId"
+          element={
+            <ProtectedRoute>
+              <PublicProfile />
             </ProtectedRoute>
           }
         />

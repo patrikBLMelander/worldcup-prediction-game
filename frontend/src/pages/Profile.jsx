@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../config/api';
 import Navigation from '../components/Navigation';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import './Profile.css';
 
 const Profile = () => {
@@ -25,9 +26,45 @@ const Profile = () => {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordError, setPasswordError] = useState('');
 
+  // Statistics state
+  const [statistics, setStatistics] = useState(null);
+  const [statisticsLoading, setStatisticsLoading] = useState(true);
+  const [performanceHistory, setPerformanceHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
   useEffect(() => {
     if (user) {
       setScreenName(user.screenName || '');
+    }
+  }, [user]);
+
+  // Fetch prediction statistics
+  useEffect(() => {
+    const fetchStatistics = async () => {
+      try {
+        const response = await apiClient.get('/users/me/prediction-statistics');
+        setStatistics(response.data);
+      } catch (error) {
+        console.error('Failed to fetch statistics:', error);
+      } finally {
+        setStatisticsLoading(false);
+      }
+    };
+
+    const fetchPerformanceHistory = async () => {
+      try {
+        const response = await apiClient.get('/users/me/performance-history');
+        setPerformanceHistory(response.data);
+      } catch (error) {
+        console.error('Failed to fetch performance history:', error);
+      } finally {
+        setHistoryLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchStatistics();
+      fetchPerformanceHistory();
     }
   }, [user]);
 
@@ -146,6 +183,107 @@ const Profile = () => {
                 </div>
               </div>
             </div>
+          </section>
+
+          {/* Prediction Statistics */}
+          <section className="profile-section">
+            <h2>Prediction Statistics</h2>
+            {statisticsLoading ? (
+              <div className="loading">Loading statistics...</div>
+            ) : statistics && statistics.totalPredictions > 0 ? (
+              <>
+                <div className="statistics-grid">
+                  <div className="stat-card">
+                    <div className="stat-icon">🎯</div>
+                    <div className="stat-content">
+                      <div className="stat-value">{statistics.accuracyPercentage.toFixed(1)}%</div>
+                      <div className="stat-label">Accuracy</div>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-icon">⭐</div>
+                    <div className="stat-content">
+                      <div className="stat-value">{statistics.exactScores}</div>
+                      <div className="stat-label">Exact Scores (3 pts)</div>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-icon">✓</div>
+                    <div className="stat-content">
+                      <div className="stat-value">{statistics.correctWinners}</div>
+                      <div className="stat-label">Correct Winners (1 pt)</div>
+                    </div>
+                  </div>
+                  <div className="stat-card">
+                    <div className="stat-icon">✗</div>
+                    <div className="stat-content">
+                      <div className="stat-value">{statistics.wrongPredictions}</div>
+                      <div className="stat-label">Wrong Predictions</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="statistics-breakdown">
+                  <p className="section-description">
+                    Based on {statistics.totalPredictions} finished match{statistics.totalPredictions !== 1 ? 'es' : ''}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <p className="section-description">
+                No statistics available yet. Make some predictions and wait for matches to finish!
+              </p>
+            )}
+          </section>
+
+          {/* Performance History Chart */}
+          <section className="profile-section">
+            <h2>Performance History</h2>
+            {historyLoading ? (
+              <div className="loading">Loading performance history...</div>
+            ) : performanceHistory.length > 0 ? (
+              <div className="chart-container">
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={performanceHistory}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                    <XAxis 
+                      dataKey="matchDate" 
+                      tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      stroke="var(--text-secondary)"
+                    />
+                    <YAxis stroke="var(--text-secondary)" />
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: 'var(--surface-elevated)',
+                        border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-lg)',
+                        color: 'var(--text-primary)'
+                      }}
+                      labelFormatter={(value) => `Match: ${new Date(value).toLocaleDateString()}`}
+                      formatter={(value, name) => {
+                        if (name === 'cumulativePoints') return [`${value} points`, 'Cumulative Points'];
+                        return value;
+                      }}
+                    />
+                    <Legend />
+                    <Line 
+                      type="monotone" 
+                      dataKey="cumulativePoints" 
+                      stroke="var(--primary-500)" 
+                      strokeWidth={3}
+                      dot={{ fill: 'var(--primary-500)', r: 4 }}
+                      name="Cumulative Points"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+                <p className="section-description">
+                  Your points progression over time. Each point represents a finished match.
+                </p>
+              </div>
+            ) : (
+              <p className="section-description">
+                No performance history yet. Make predictions and wait for matches to finish!
+              </p>
+            )}
           </section>
 
           {/* Change Screen Name */}

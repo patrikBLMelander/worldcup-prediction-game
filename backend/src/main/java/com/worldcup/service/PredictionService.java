@@ -1,5 +1,7 @@
 package com.worldcup.service;
 
+import com.worldcup.dto.PerformanceHistoryDTO;
+import com.worldcup.dto.PredictionStatisticsDTO;
 import com.worldcup.entity.Match;
 import com.worldcup.entity.Prediction;
 import com.worldcup.entity.User;
@@ -8,8 +10,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -118,6 +122,99 @@ public class PredictionService {
 
         // Wrong prediction: 0 points
         return 0;
+    }
+
+    public PredictionStatisticsDTO getPredictionStatistics(User user) {
+        List<Prediction> predictions = predictionRepository.findByUser(user);
+        
+        // Filter only predictions for finished matches with points calculated
+        List<Prediction> finishedPredictions = predictions.stream()
+            .filter(p -> p.getPoints() != null && 
+                        p.getMatch().getStatus() == com.worldcup.entity.MatchStatus.FINISHED &&
+                        p.getMatch().getHomeScore() != null &&
+                        p.getMatch().getAwayScore() != null)
+            .collect(Collectors.toList());
+        
+        int totalPredictions = finishedPredictions.size();
+        int exactScores = 0;
+        int correctWinners = 0;
+        int wrongPredictions = 0;
+        int totalPoints = 0;
+        
+        for (Prediction pred : finishedPredictions) {
+            Integer points = pred.getPoints();
+            if (points != null) {
+                totalPoints += points;
+                if (points == 3) {
+                    exactScores++;
+                } else if (points == 1) {
+                    correctWinners++;
+                } else {
+                    wrongPredictions++;
+                }
+            }
+        }
+        
+        // Calculate accuracy: (exact + correct winner) / total * 100
+        double accuracyPercentage = totalPredictions > 0 
+            ? ((double)(exactScores + correctWinners) / totalPredictions) * 100.0
+            : 0.0;
+        
+        return new PredictionStatisticsDTO(
+            totalPredictions,
+            exactScores,
+            correctWinners,
+            wrongPredictions,
+            Math.round(accuracyPercentage * 100.0) / 100.0, // Round to 2 decimal places
+            totalPoints
+        );
+    }
+
+    public List<PerformanceHistoryDTO> getPerformanceHistory(User user) {
+        List<Prediction> predictions = predictionRepository.findByUser(user);
+        
+        // Filter only finished matches with points calculated, sorted by match date
+        List<Prediction> finishedPredictions = predictions.stream()
+            .filter(p -> p.getPoints() != null && 
+                        p.getMatch().getStatus() == com.worldcup.entity.MatchStatus.FINISHED &&
+                        p.getMatch().getHomeScore() != null &&
+                        p.getMatch().getAwayScore() != null)
+            .sorted((p1, p2) -> p1.getMatch().getMatchDate().compareTo(p2.getMatch().getMatchDate()))
+            .collect(Collectors.toList());
+        
+        List<PerformanceHistoryDTO> history = new ArrayList<>();
+        int cumulativePoints = 0;
+        
+        for (Prediction pred : finishedPredictions) {
+            Match match = pred.getMatch();
+            Integer points = pred.getPoints();
+            cumulativePoints += (points != null ? points : 0);
+            
+            String resultType;
+            if (points == null || points == 0) {
+                resultType = "WRONG";
+            } else if (points == 3) {
+                resultType = "EXACT";
+            } else {
+                resultType = "CORRECT_WINNER";
+            }
+            
+            history.add(new PerformanceHistoryDTO(
+                match.getId(),
+                match.getHomeTeam(),
+                match.getAwayTeam(),
+                match.getMatchDate(),
+                pred.getPredictedHomeScore(),
+                pred.getPredictedAwayScore(),
+                match.getHomeScore(),
+                match.getAwayScore(),
+                points,
+                resultType,
+                cumulativePoints
+            ));
+        }
+        
+        return history;
     }
 }
 

@@ -71,7 +71,7 @@ const Register = () => {
 
   return (
     <>
-      <div className="auth-container">
+      <div className={`auth-container ${showScreenNameModal ? 'modal-open' : ''}`}>
         <div className="auth-card">
           <h1>World Cup 2026</h1>
           <h2>Register</h2>

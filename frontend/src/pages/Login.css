@@ -9,6 +9,19 @@
   overflow: hidden;
 }
 
+.auth-container.modal-open {
+  pointer-events: none;
+  position: relative;
+}
+
+.auth-container.modal-open .auth-card {
+  opacity: 0.2;
+  filter: blur(6px);
+  pointer-events: none;
+  transform: scale(0.95);
+  transition: all 0.3s ease-out;
+}
+
 .auth-container::before {
   content: '';
   position: absolute;
