@@ -15,10 +15,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class PredictionService {
 
     private final PredictionRepository predictionRepository;
@@ -86,14 +88,24 @@ public class PredictionService {
         List<Prediction> predictions = predictionRepository.findByMatch(match);
 
         for (Prediction prediction : predictions) {
-            int points = calculatePoints(
-                prediction.getPredictedHomeScore(),
-                prediction.getPredictedAwayScore(),
-                match.getHomeScore(),
-                match.getAwayScore()
-            );
-            prediction.setPoints(points);
-            predictionRepository.save(prediction);
+            // Skip predictions with null predicted scores
+            if (prediction.getPredictedHomeScore() == null || prediction.getPredictedAwayScore() == null) {
+                continue;
+            }
+            
+            try {
+                int points = calculatePoints(
+                    prediction.getPredictedHomeScore(),
+                    prediction.getPredictedAwayScore(),
+                    match.getHomeScore(),
+                    match.getAwayScore()
+                );
+                prediction.setPoints(points);
+                predictionRepository.save(prediction);
+            } catch (Exception e) {
+                // Log error but continue processing other predictions
+                log.error("Error calculating points for prediction {}: {}", prediction.getId(), e.getMessage());
+            }
         }
     }
 
@@ -131,39 +143,60 @@ public class PredictionService {
 
     public PredictionStatisticsDTO getPredictionStatistics(User user) {
         // Use JOIN FETCH to ensure match data is loaded for filtering
-        List<Prediction> predictions = predictionRepository.findByUserWithMatch(user);
+        List<Prediction> predictions;
+        try {
+            predictions = predictionRepository.findByUserWithMatch(user);
+        } catch (Exception e) {
+            // Fallback to regular query if JOIN FETCH fails (e.g., data inconsistencies)
+            log.warn("JOIN FETCH query failed for user {}, falling back to regular query: {}", user.getId(), e.getMessage());
+            predictions = predictionRepository.findByUser(user);
+        }
         
         // Filter predictions for matches that have scores
         // CRITICAL: Only include FINISHED or LIVE matches - never SCHEDULED
         // Calculate points on the fly if missing
         List<Prediction> finishedPredictions = predictions.stream()
             .filter(p -> {
-                Match match = p.getMatch();
-                if (match == null) return false;
-                
-                // Only show predictions for LIVE or FINISHED matches
-                MatchStatus status = match.getStatus();
-                if (status != MatchStatus.FINISHED && status != MatchStatus.LIVE) {
-                    return false; // Don't include SCHEDULED or CANCELLED matches
+                try {
+                    Match match = p.getMatch();
+                    if (match == null) return false;
+                    
+                    // Only show predictions for LIVE or FINISHED matches
+                    MatchStatus status = match.getStatus();
+                    if (status != MatchStatus.FINISHED && status != MatchStatus.LIVE) {
+                        return false; // Don't include SCHEDULED or CANCELLED matches
+                    }
+                    
+                    // Must have scores
+                    return match.getHomeScore() != null && match.getAwayScore() != null;
+                } catch (Exception e) {
+                    // Skip predictions with issues (e.g., lazy loading problems)
+                    log.warn("Error processing prediction {} in statistics: {}", p.getId(), e.getMessage());
+                    return false;
                 }
-                
-                // Must have scores
-                return match.getHomeScore() != null && match.getAwayScore() != null;
             })
             .map(p -> {
-                // Calculate points if not already calculated
-                if (p.getPoints() == null) {
-                    Match match = p.getMatch();
-                    int points = calculatePoints(
-                        p.getPredictedHomeScore(),
-                        p.getPredictedAwayScore(),
-                        match.getHomeScore(),
-                        match.getAwayScore()
-                    );
-                    p.setPoints(points);
-                    predictionRepository.save(p);
+                try {
+                    // Calculate points if not already calculated
+                    if (p.getPoints() == null) {
+                        Match match = p.getMatch();
+                        if (match != null && match.getHomeScore() != null && match.getAwayScore() != null &&
+                            p.getPredictedHomeScore() != null && p.getPredictedAwayScore() != null) {
+                            int points = calculatePoints(
+                                p.getPredictedHomeScore(),
+                                p.getPredictedAwayScore(),
+                                match.getHomeScore(),
+                                match.getAwayScore()
+                            );
+                            p.setPoints(points);
+                            predictionRepository.save(p);
+                        }
+                    }
+                    return p;
+                } catch (Exception e) {
+                    log.warn("Error calculating points for prediction {}: {}", p.getId(), e.getMessage());
+                    return p; // Return prediction anyway, points will remain null
                 }
-                return p;
             })
             .collect(Collectors.toList());
         
@@ -204,41 +237,69 @@ public class PredictionService {
 
     public List<PerformanceHistoryDTO> getPerformanceHistory(User user) {
         // Use JOIN FETCH to ensure match data is loaded
-        List<Prediction> predictions = predictionRepository.findByUserWithMatch(user);
+        List<Prediction> predictions;
+        try {
+            predictions = predictionRepository.findByUserWithMatch(user);
+        } catch (Exception e) {
+            // Fallback to regular query if JOIN FETCH fails (e.g., data inconsistencies)
+            log.warn("JOIN FETCH query failed for user {}, falling back to regular query: {}", user.getId(), e.getMessage());
+            predictions = predictionRepository.findByUser(user);
+        }
         
         // Filter predictions for matches that have scores
         // CRITICAL: Only include FINISHED or LIVE matches - never SCHEDULED
         // Calculate points on the fly if missing
         List<Prediction> finishedPredictions = predictions.stream()
             .filter(p -> {
-                Match match = p.getMatch();
-                if (match == null) return false;
-                
-                // Only show predictions for LIVE or FINISHED matches
-                MatchStatus status = match.getStatus();
-                if (status != MatchStatus.FINISHED && status != MatchStatus.LIVE) {
-                    return false; // Don't include SCHEDULED or CANCELLED matches
+                try {
+                    Match match = p.getMatch();
+                    if (match == null) return false;
+                    
+                    // Only show predictions for LIVE or FINISHED matches
+                    MatchStatus status = match.getStatus();
+                    if (status != MatchStatus.FINISHED && status != MatchStatus.LIVE) {
+                        return false; // Don't include SCHEDULED or CANCELLED matches
+                    }
+                    
+                    // Must have scores
+                    return match.getHomeScore() != null && match.getAwayScore() != null;
+                } catch (Exception e) {
+                    // Skip predictions with issues (e.g., lazy loading problems)
+                    log.warn("Error processing prediction {} in performance history: {}", p.getId(), e.getMessage());
+                    return false;
                 }
-                
-                // Must have scores
-                return match.getHomeScore() != null && match.getAwayScore() != null;
             })
             .map(p -> {
-                // Calculate points if not already calculated
-                if (p.getPoints() == null) {
-                    Match match = p.getMatch();
-                    int points = calculatePoints(
-                        p.getPredictedHomeScore(),
-                        p.getPredictedAwayScore(),
-                        match.getHomeScore(),
-                        match.getAwayScore()
-                    );
-                    p.setPoints(points);
-                    predictionRepository.save(p);
+                try {
+                    // Calculate points if not already calculated
+                    if (p.getPoints() == null) {
+                        Match match = p.getMatch();
+                        if (match != null && match.getHomeScore() != null && match.getAwayScore() != null &&
+                            p.getPredictedHomeScore() != null && p.getPredictedAwayScore() != null) {
+                            int points = calculatePoints(
+                                p.getPredictedHomeScore(),
+                                p.getPredictedAwayScore(),
+                                match.getHomeScore(),
+                                match.getAwayScore()
+                            );
+                            p.setPoints(points);
+                            predictionRepository.save(p);
+                        }
+                    }
+                    return p;
+                } catch (Exception e) {
+                    log.warn("Error calculating points for prediction {}: {}", p.getId(), e.getMessage());
+                    return p; // Return prediction anyway, points will remain null
                 }
-                return p;
             })
-            .sorted((p1, p2) -> p1.getMatch().getMatchDate().compareTo(p2.getMatch().getMatchDate()))
+            .sorted((p1, p2) -> {
+                try {
+                    return p1.getMatch().getMatchDate().compareTo(p2.getMatch().getMatchDate());
+                } catch (Exception e) {
+                    log.warn("Error sorting predictions: {}", e.getMessage());
+                    return 0;
+                }
+            })
             .collect(Collectors.toList());
         
         List<PerformanceHistoryDTO> history = new ArrayList<>();

@@ -15,6 +15,7 @@ import com.worldcup.service.PredictionService;
 import com.worldcup.service.WebSocketService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +28,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor
 @AdminRequired
+@Slf4j
 public class AdminController {
 
     private final MatchService matchService;
@@ -97,15 +99,36 @@ public class AdminController {
     public ResponseEntity<MatchDTO> updateMatchResult(
             @PathVariable Long id,
             @Valid @RequestBody UpdateMatchResultRequest request) {
-        Match match = matchService.updateMatchResult(
-                id,
-                request.getHomeScore(),
-                request.getAwayScore()
-        );
-        predictionService.calculatePointsForMatch(id);
-        // Broadcast match update via WebSocket
-        webSocketService.broadcastMatchUpdate(id);
-        return ResponseEntity.ok(convertToDTO(match));
+        try {
+            Match match = matchService.updateMatchResult(
+                    id,
+                    request.getHomeScore(),
+                    request.getAwayScore()
+            );
+            
+            // Calculate points for all predictions of this match
+            // Note: This is also handled by MatchEntityListener, but we call it explicitly
+            // to ensure it happens immediately. The method is idempotent, so calling it twice is safe.
+            try {
+                predictionService.calculatePointsForMatch(id);
+            } catch (Exception e) {
+                // Log error but don't fail the request - match result was updated successfully
+                // Points will be calculated by MatchEntityListener or can be recalculated later
+                log.error("Error calculating points for match {}: {}", id, e.getMessage(), e);
+            }
+            
+            // Broadcast match update via WebSocket
+            webSocketService.broadcastMatchUpdate(id);
+            return ResponseEntity.ok(convertToDTO(match));
+        } catch (IllegalArgumentException e) {
+            log.error("Match not found: {}", id);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(null);
+        } catch (Exception e) {
+            log.error("Error updating match result for match {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(null);
+        }
     }
 
     @PutMapping("/matches/{id}/status")

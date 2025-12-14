@@ -39,7 +39,8 @@ public class MatchEntityListener implements ApplicationContextAware {
                     log.info("Automatically calculated points for finished match {}", match.getId());
                 }
             } catch (Exception e) {
-                log.error("Failed to calculate points for match {}: {}", match.getId(), e.getMessage());
+                // Log error but don't throw - entity listeners should not break transactions
+                log.error("Failed to calculate points for match {}: {}", match.getId(), e.getMessage(), e);
             }
         }
     }

@@ -20,6 +20,7 @@ import com.worldcup.service.PredictionService;
 import com.worldcup.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,6 +32,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
+@Slf4j
 public class UserController {
 
     private final CurrentUser currentUser;
@@ -190,22 +192,36 @@ public class UserController {
         // Get finished predictions - ONLY show predictions for matches that are LIVE or FINISHED
         // Never show predictions for SCHEDULED matches (even if they have scores somehow)
         // Use JOIN FETCH to ensure match data is loaded
-        List<Prediction> allPredictions = predictionRepository.findByUserWithMatch(user);
+        List<Prediction> allPredictions;
+        try {
+            allPredictions = predictionRepository.findByUserWithMatch(user);
+        } catch (Exception e) {
+            // Fallback to regular query if JOIN FETCH fails (e.g., data inconsistencies)
+            log.warn("JOIN FETCH query failed for user {}, falling back to regular query: {}", user.getId(), e.getMessage());
+            allPredictions = predictionRepository.findByUser(user);
+        }
+        
         List<FinishedPredictionDTO> finishedPredictions = allPredictions.stream()
                 .filter(p -> {
-                    Match match = p.getMatch();
-                    if (match == null) return false;
-                    
-                    // CRITICAL: Only show predictions for LIVE or FINISHED matches
-                    // Never show predictions for SCHEDULED matches (game hasn't started yet)
-                    MatchStatus status = match.getStatus();
-                    if (status != MatchStatus.FINISHED && status != MatchStatus.LIVE) {
-                        return false; // Don't show predictions for SCHEDULED or CANCELLED matches
+                    try {
+                        Match match = p.getMatch();
+                        if (match == null) return false;
+                        
+                        // CRITICAL: Only show predictions for LIVE or FINISHED matches
+                        // Never show predictions for SCHEDULED matches (game hasn't started yet)
+                        MatchStatus status = match.getStatus();
+                        if (status != MatchStatus.FINISHED && status != MatchStatus.LIVE) {
+                            return false; // Don't show predictions for SCHEDULED or CANCELLED matches
+                        }
+                        
+                        // Must have scores to show the prediction
+                        boolean hasScores = match.getHomeScore() != null && match.getAwayScore() != null;
+                        return hasScores;
+                    } catch (Exception e) {
+                        // Skip predictions with issues (e.g., lazy loading problems)
+                        log.warn("Error processing prediction {}: {}", p.getId(), e.getMessage());
+                        return false;
                     }
-                    
-                    // Must have scores to show the prediction
-                    boolean hasScores = match.getHomeScore() != null && match.getAwayScore() != null;
-                    return hasScores;
                 })
                 .sorted((p1, p2) -> p2.getMatch().getMatchDate().compareTo(p1.getMatch().getMatchDate())) // Most recent first
                 .map(p -> {
