@@ -19,6 +19,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -100,32 +102,61 @@ public class AdminController {
             @PathVariable Long id,
             @Valid @RequestBody UpdateMatchResultRequest request) {
         try {
+            log.info("Updating match result for match {}: {} - {}", id, request.getHomeScore(), request.getAwayScore());
+            
             Match match = matchService.updateMatchResult(
                     id,
                     request.getHomeScore(),
                     request.getAwayScore()
             );
             
-            // Calculate points for all predictions of this match
-            // Note: This is also handled by MatchEntityListener, but we call it explicitly
-            // to ensure it happens immediately. The method is idempotent, so calling it twice is safe.
-            try {
-                predictionService.calculatePointsForMatch(id);
-            } catch (Exception e) {
-                // Log error but don't fail the request - match result was updated successfully
-                // Points will be calculated by MatchEntityListener or can be recalculated later
-                log.error("Error calculating points for match {}: {}", id, e.getMessage(), e);
+            log.info("Match {} updated successfully, converting to DTO", id);
+            
+            // Convert to DTO within the transaction to avoid lazy loading issues
+            MatchDTO matchDTO = convertToDTO(match);
+            
+            log.info("DTO converted successfully for match {}", id);
+            
+            // Calculate points after transaction commits to avoid conflicts
+            if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            try {
+                                log.info("Transaction committed, calculating points for match {}", id);
+                                predictionService.calculatePointsForMatch(id);
+                                log.info("Calculated points for match {} after transaction commit", id);
+                            } catch (Exception e) {
+                                log.error("Error calculating points for match {} after commit: {}", id, e.getMessage(), e);
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                );
+            } else {
+                log.warn("No active transaction when trying to register synchronization for match {}", id);
             }
             
             // Broadcast match update via WebSocket
-            webSocketService.broadcastMatchUpdate(id);
-            return ResponseEntity.ok(convertToDTO(match));
+            try {
+                webSocketService.broadcastMatchUpdate(id);
+                log.info("WebSocket broadcast sent for match {}", id);
+            } catch (Exception e) {
+                log.error("Error broadcasting match update for match {}: {}", id, e.getMessage(), e);
+                // Don't fail the request if WebSocket broadcast fails
+            }
+            
+            log.info("Successfully updated match result for match {}", id);
+            return ResponseEntity.ok(matchDTO);
         } catch (IllegalArgumentException e) {
-            log.error("Match not found: {}", id);
+            log.error("Match not found: {}", id, e);
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(null);
         } catch (Exception e) {
             log.error("Error updating match result for match {}: {}", id, e.getMessage(), e);
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(null);
         }

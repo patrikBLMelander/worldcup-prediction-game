@@ -4,6 +4,7 @@ import com.worldcup.entity.Match;
 import com.worldcup.entity.MatchStatus;
 import com.worldcup.repository.MatchRepository;
 import com.worldcup.service.FootballApiService;
+import com.worldcup.service.PredictionService;
 import com.worldcup.service.WebSocketService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +12,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -32,6 +35,7 @@ public class FootballApiSyncScheduler {
     private final FootballApiService footballApiService;
     private final MatchRepository matchRepository;
     private final WebSocketService webSocketService;
+    private final PredictionService predictionService;
 
     @Value("${football.api.enabled:false}")
     private boolean apiEnabled;
@@ -195,6 +199,26 @@ public class FootballApiSyncScheduler {
                     // Update match to finished status with final scores
                     footballApiService.updateMatchFromApi(existingMatch, apiMatch);
                     matchRepository.save(existingMatch);
+                    
+                    // Calculate points after transaction commits if match has scores
+                    Long matchId = existingMatch.getId();
+                    if (existingMatch.getHomeScore() != null && existingMatch.getAwayScore() != null) {
+                        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                            TransactionSynchronizationManager.registerSynchronization(
+                                new TransactionSynchronization() {
+                                    @Override
+                                    public void afterCommit() {
+                                        try {
+                                            log.info("Calculating points for finished match {} from API sync after transaction commit", matchId);
+                                            predictionService.calculatePointsForMatch(matchId);
+                                        } catch (Exception e) {
+                                            log.error("Error calculating points for match {} after commit: {}", matchId, e.getMessage(), e);
+                                        }
+                                    }
+                                }
+                            );
+                        }
+                    }
                     
                     // Broadcast update via WebSocket
                     webSocketService.broadcastMatchUpdate(existingMatch.getId());

@@ -3,12 +3,15 @@ package com.worldcup.config;
 import com.worldcup.entity.Match;
 import com.worldcup.entity.MatchStatus;
 import com.worldcup.repository.MatchRepository;
+import com.worldcup.service.PredictionService;
 import com.worldcup.service.WebSocketService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -22,6 +25,7 @@ public class MatchStatusScheduler {
 
     private final MatchRepository matchRepository;
     private final WebSocketService webSocketService;
+    private final PredictionService predictionService;
 
     @jakarta.annotation.PostConstruct
     public void init() {
@@ -117,8 +121,24 @@ public class MatchStatusScheduler {
                 // Broadcast update via WebSocket
                 webSocketService.broadcastMatchStatusChange(matchId, oldStatus.name(), MatchStatus.FINISHED.name());
                 
-                // Note: Points calculation is automatically handled by MatchEntityListener
-                // when match is saved with FINISHED status and has scores
+                // Calculate points after transaction commits if match has scores
+                if (match.getHomeScore() != null && match.getAwayScore() != null) {
+                    if (TransactionSynchronizationManager.isActualTransactionActive()) {
+                        TransactionSynchronizationManager.registerSynchronization(
+                            new TransactionSynchronization() {
+                                @Override
+                                public void afterCommit() {
+                                    try {
+                                        log.info("Calculating points for finished match {} after transaction commit", matchId);
+                                        predictionService.calculatePointsForMatch(matchId);
+                                    } catch (Exception e) {
+                                        log.error("Error calculating points for match {} after commit: {}", matchId, e.getMessage(), e);
+                                    }
+                                }
+                            }
+                        );
+                    }
+                }
             }
         } catch (Exception e) {
             log.error("Error updating match {} to FINISHED: {}", matchId, e.getMessage(), e);

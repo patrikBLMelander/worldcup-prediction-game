@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -85,8 +87,23 @@ public class MatchController {
                 request.getAwayScore()
         );
 
-        // Calculate points for all predictions of this match
-        predictionService.calculatePointsForMatch(id);
+        // Calculate points after transaction commits to avoid conflicts
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        try {
+                            predictionService.calculatePointsForMatch(id);
+                        } catch (Exception e) {
+                            // Log error but don't fail - match result was already saved
+                            org.slf4j.LoggerFactory.getLogger(MatchController.class)
+                                .error("Error calculating points for match {} after commit: {}", id, e.getMessage(), e);
+                        }
+                    }
+                }
+            );
+        }
 
         // Broadcast update via WebSocket
         webSocketService.broadcastMatchUpdate(id);
