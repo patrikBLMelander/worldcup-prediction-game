@@ -70,14 +70,14 @@
 }
 
 .tab-button:hover {
-  color: var(--text-primary);
+  color: var(--text-secondary);
   background: var(--surface-elevated);
 }
 
 .tab-button.active {
-  color: var(--text-primary);
+  color: var(--text-secondary);
   background: var(--surface-elevated);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .tab-icon {
@@ -100,8 +100,8 @@
 }
 
 .tab-button.active .tab-count {
-  background: var(--primary-500);
-  color: white;
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
 }
 
 .matches-filters-wrapper {
