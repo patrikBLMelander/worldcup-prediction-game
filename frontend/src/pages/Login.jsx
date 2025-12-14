@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ScreenNameModal from '../components/ScreenNameModal';
+import CountryFlagsBackground from '../components/CountryFlagsBackground';
 import './Login.css';
 
 const Login = () => {
@@ -60,6 +61,7 @@ const Login = () => {
   return (
     <>
     <div className="auth-container">
+      <CountryFlagsBackground />
       <div className="auth-card">
         <h1>World Cup 2026</h1>
         <h2>Login</h2>

@@ -7,6 +7,7 @@
   padding: var(--spacing-xl);
   position: relative;
   overflow: hidden;
+  z-index: 1;
 }
 
 .auth-container.modal-open {
@@ -43,8 +44,9 @@
   max-width: 440px;
   box-shadow: var(--shadow-2xl);
   position: relative;
-  z-index: 1;
+  z-index: 10;
   border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
 }
 
 .auth-card h1 {
