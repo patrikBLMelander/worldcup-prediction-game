@@ -21,6 +21,7 @@ const Matches = () => {
   const [userPredictions, setUserPredictions] = useState({});
   const [predictionInputs, setPredictionInputs] = useState({});
   const [savingStates, setSavingStates] = useState({});
+  const [expandedFinishedMatches, setExpandedFinishedMatches] = useState(new Set());
   const debounceTimers = useRef({});
 
   // Fetch predictions with points for finished matches
@@ -430,11 +431,33 @@ const Matches = () => {
               // Use team crest/logo if available, otherwise fallback to flag
               const homeLogoUrl = match.homeTeamCrest || getFlagUrl(match.homeTeam);
               const awayLogoUrl = match.awayTeamCrest || getFlagUrl(match.awayTeam);
+              const isFinished = match.status === 'FINISHED';
+              const isExpanded = expandedFinishedMatches.has(match.id);
+              
               return (
-                <div key={match.id} className="match-card">
+                <div key={match.id} className={`match-card ${isFinished ? 'finished-match' : ''} ${isFinished && !isExpanded ? 'collapsed' : ''}`}>
                   <div className="match-header">
                     <span className="match-status">{match.status}</span>
                     <span className="match-group">{match.group}</span>
+                    {isFinished && (
+                      <button
+                        className="expand-toggle"
+                        onClick={() => {
+                          setExpandedFinishedMatches(prev => {
+                            const newSet = new Set(prev);
+                            if (newSet.has(match.id)) {
+                              newSet.delete(match.id);
+                            } else {
+                              newSet.add(match.id);
+                            }
+                            return newSet;
+                          });
+                        }}
+                        aria-label={isExpanded ? 'Collapse' : 'Expand'}
+                      >
+                        {isExpanded ? '▼' : '▶'}
+                      </button>
+                    )}
                   </div>
                   
                   <div className="match-teams">
@@ -447,11 +470,11 @@ const Matches = () => {
                           }
                         }} />
                         <span>{match.homeTeam}</span>
+                        {/* Show live/actual score inline if available */}
+                        {(match.status === 'FINISHED' || match.status === 'LIVE') && match.homeScore !== null && (
+                          <span className="team-score">{match.homeScore}</span>
+                        )}
                       </div>
-                      {/* Show live/actual score if available */}
-                      {(match.status === 'FINISHED' || match.status === 'LIVE') && match.homeScore !== null && (
-                        <div className="team-score">{match.homeScore}</div>
-                      )}
                       {/* Show prediction input only if match is scheduled (not LIVE or FINISHED) */}
                       {match.status === 'SCHEDULED' && (
                         <div className="prediction-input-wrapper">
@@ -479,11 +502,11 @@ const Matches = () => {
                           }
                         }} />
                         <span>{match.awayTeam}</span>
+                        {/* Show live/actual score inline if available */}
+                        {(match.status === 'FINISHED' || match.status === 'LIVE') && match.awayScore !== null && (
+                          <span className="team-score">{match.awayScore}</span>
+                        )}
                       </div>
-                      {/* Show live/actual score if available */}
-                      {(match.status === 'FINISHED' || match.status === 'LIVE') && match.awayScore !== null && (
-                        <div className="team-score">{match.awayScore}</div>
-                      )}
                       {/* Show prediction input only if match is scheduled (not LIVE or FINISHED) */}
                       {match.status === 'SCHEDULED' && (
                         <div className="prediction-input-wrapper">
@@ -501,37 +524,57 @@ const Matches = () => {
                     </div>
                   </div>
 
-                  <div className="match-info">
-                    <div className="match-date">
-                      {(() => {
-                        // Parse date string as UTC (backend stores as UTC LocalDateTime)
-                        const dateStr = match.matchDate;
-                        const utcDate = dateStr.endsWith('Z') 
-                          ? new Date(dateStr)
-                          : new Date(dateStr + 'Z'); // Append Z if not present to treat as UTC
-                        return utcDate.toLocaleString('en-US', {
-                          weekday: 'short',
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          timeZone: 'UTC'
-                        });
-                      })()}
+                  {/* Collapsed view for finished matches - show only essential info */}
+                  {isFinished && !isExpanded && (
+                    <div className="finished-match-compact">
+                      {userPredictions[match.id] && (
+                        <div className="compact-points-container">
+                          <span className={`compact-points ${userPredictions[match.id].points !== null && userPredictions[match.id].points !== undefined ? 'points-calculated' : 'points-pending'}`}>
+                            {userPredictions[match.id].points !== null && userPredictions[match.id].points !== undefined
+                              ? `${userPredictions[match.id].points} ${userPredictions[match.id].points === 1 ? 'point' : 'points'}`
+                              : 'Points pending'}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  )}
 
-                  {/* Show prediction summary for LIVE or FINISHED matches */}
-                  {(match.status === 'LIVE' || match.status === 'FINISHED') && (
-                    <div className="prediction-summary">
-                      <span className="prediction-summary-label">Your Prediction:</span>
-                      <span className="prediction-summary-score">
-                        {prediction && prediction.homeScore !== undefined && prediction.awayScore !== undefined
-                          ? `${prediction.homeScore} - ${prediction.awayScore}`
-                          : 'No prediction'}
-                      </span>
-                    </div>
+                  {/* Expanded content - only show when expanded or not finished */}
+                  {(isExpanded || !isFinished) && (
+                    <>
+                      <div className="match-info">
+                        <div className="match-date">
+                          {(() => {
+                            // Parse date string as UTC (backend stores as UTC LocalDateTime)
+                            const dateStr = match.matchDate;
+                            const utcDate = dateStr.endsWith('Z') 
+                              ? new Date(dateStr)
+                              : new Date(dateStr + 'Z'); // Append Z if not present to treat as UTC
+                            return utcDate.toLocaleString('en-US', {
+                              weekday: 'short',
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              timeZone: 'UTC'
+                            });
+                          })()}
+                        </div>
+                      </div>
+
+                      {/* Show prediction summary for LIVE or FINISHED matches */}
+                      {(match.status === 'LIVE' || match.status === 'FINISHED') && (
+                        <div className="prediction-summary">
+                          <span className="prediction-summary-label">Your Prediction:</span>
+                          <span className="prediction-summary-score">
+                            {prediction && prediction.homeScore !== undefined && prediction.awayScore !== undefined
+                              ? `${prediction.homeScore} - ${prediction.awayScore}`
+                              : 'No prediction'}
+                          </span>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   {/* Countdown timer at bottom center - show for scheduled matches */}
@@ -564,8 +607,8 @@ const Matches = () => {
                     </div>
                   )}
                   
-                  {/* Locked message for live or finished matches */}
-                  {(match.status === 'LIVE' || match.status === 'FINISHED') && (
+                  {/* Locked message for live or finished matches - only show when expanded */}
+                  {(match.status === 'LIVE' || (match.status === 'FINISHED' && isExpanded)) && (
                     <div className="match-actions">
                       <span className="prediction-status locked">
                         {match.status === 'LIVE' ? '🔒 Predictions locked - Match is LIVE' : '🔒 Predictions locked - Match is FINISHED'}
@@ -573,8 +616,8 @@ const Matches = () => {
                     </div>
                   )}
 
-                  {/* Results summary for finished matches */}
-                  {match.status === 'FINISHED' && (
+                  {/* Results summary for finished matches - only show when expanded */}
+                  {match.status === 'FINISHED' && isExpanded && (
                     <div className="match-result-summary">
                       <div className="result-comparison">
                         <div className="result-row">
