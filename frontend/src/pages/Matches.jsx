@@ -22,6 +22,7 @@ const Matches = () => {
   const [predictionInputs, setPredictionInputs] = useState({});
   const [savingStates, setSavingStates] = useState({});
   const [expandedFinishedMatches, setExpandedFinishedMatches] = useState(new Set());
+  const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming' or 'results'
   const debounceTimers = useRef({});
 
   // Fetch predictions with points for finished matches
@@ -264,9 +265,19 @@ const Matches = () => {
   useEffect(() => {
     let filtered = matches;
 
-    // Filter by status
-    if (statusFilter !== 'ALL') {
-      filtered = filtered.filter(m => m.status === statusFilter);
+    // Filter by active tab first
+    if (activeTab === 'upcoming') {
+      filtered = filtered.filter(m => m.status === 'SCHEDULED' || m.status === 'LIVE');
+    } else if (activeTab === 'results') {
+      filtered = filtered.filter(m => m.status === 'FINISHED');
+    }
+
+    // Filter by status (only if not using tabs)
+    if (statusFilter !== 'ALL' && activeTab === 'upcoming') {
+      // For upcoming tab, we already filtered, but allow further filtering within LIVE/SCHEDULED
+      if (statusFilter === 'SCHEDULED' || statusFilter === 'LIVE') {
+        filtered = filtered.filter(m => m.status === statusFilter);
+      }
     }
 
     // Filter by group
@@ -309,8 +320,13 @@ const Matches = () => {
       return sortOrder === 'asc' ? comparison : -comparison;
     });
 
+    // For results tab, default to newest first
+    if (activeTab === 'results' && sortBy === 'date' && sortOrder === 'asc') {
+      filtered.reverse();
+    }
+
     setFilteredMatches(filtered);
-  }, [matches, statusFilter, groupFilter, sortBy, sortOrder, searchTerm]);
+  }, [matches, statusFilter, groupFilter, sortBy, sortOrder, searchTerm, activeTab]);
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -340,6 +356,30 @@ const Matches = () => {
         <div className="matches-header">
           <h1>World Cup 2026 Matches</h1>
           <p>View all matches and make your predictions</p>
+        </div>
+
+        {/* Tab Navigation */}
+        <div className="matches-tabs">
+          <button
+            className={`tab-button ${activeTab === 'upcoming' ? 'active' : ''}`}
+            onClick={() => setActiveTab('upcoming')}
+          >
+            <span className="tab-icon">📅</span>
+            <span className="tab-label">Upcoming</span>
+            <span className="tab-count">
+              ({matches.filter(m => m.status === 'SCHEDULED' || m.status === 'LIVE').length})
+            </span>
+          </button>
+          <button
+            className={`tab-button ${activeTab === 'results' ? 'active' : ''}`}
+            onClick={() => setActiveTab('results')}
+          >
+            <span className="tab-icon">🏆</span>
+            <span className="tab-label">Results</span>
+            <span className="tab-count">
+              ({matches.filter(m => m.status === 'FINISHED').length})
+            </span>
+          </button>
         </div>
 
         <div className="matches-filters-wrapper">
@@ -417,7 +457,9 @@ const Matches = () => {
         </div>
 
         <div className="matches-count">
-          Showing {filteredMatches.length} of {matches.length} matches
+          Showing {filteredMatches.length} {activeTab === 'upcoming' ? 'upcoming' : 'finished'} {filteredMatches.length === 1 ? 'match' : 'matches'}
+          {filteredMatches.length !== matches.filter(m => activeTab === 'upcoming' ? (m.status === 'SCHEDULED' || m.status === 'LIVE') : m.status === 'FINISHED').length && 
+            ` (of ${matches.filter(m => activeTab === 'upcoming' ? (m.status === 'SCHEDULED' || m.status === 'LIVE') : m.status === 'FINISHED').length} total)`}
         </div>
 
         {filteredMatches.length === 0 ? (
@@ -434,11 +476,26 @@ const Matches = () => {
               const isFinished = match.status === 'FINISHED';
               const isExpanded = expandedFinishedMatches.has(match.id);
               
+              // Determine result type for finished matches
+              let resultType = null;
+              if (isFinished && prediction && match.homeScore !== null && match.awayScore !== null) {
+                const points = prediction.points;
+                if (points === 3) {
+                  resultType = 'exact';
+                } else if (points === 1) {
+                  resultType = 'correct-winner';
+                } else if (points === 0 || points === null) {
+                  resultType = 'wrong';
+                }
+              }
+
               return (
-                <div key={match.id} className={`match-card ${isFinished ? 'finished-match' : ''} ${isFinished && !isExpanded ? 'collapsed' : ''}`}>
+                <div key={match.id} className={`match-card ${isFinished ? 'finished-match' : ''} ${isFinished && !isExpanded ? 'collapsed' : ''} ${activeTab === 'results' ? 'results-view' : 'upcoming-view'} ${resultType ? `result-${resultType}` : ''}`}>
                   <div className="match-header">
-                    <span className="match-status">{match.status}</span>
-                    <span className="match-group">{match.group}</span>
+                    <div className="match-header-left">
+                      <span className={`match-status status-${match.status.toLowerCase()}`}>{match.status}</span>
+                      <span className="match-group">{match.group}</span>
+                    </div>
                     {isFinished && (
                       <button
                         className="expand-toggle"
@@ -527,15 +584,28 @@ const Matches = () => {
                   {/* Collapsed view for finished matches - show only essential info */}
                   {isFinished && !isExpanded && (
                     <div className="finished-match-compact">
-                      {userPredictions[match.id] && (
-                        <div className="compact-points-container">
-                          <span className={`compact-points ${userPredictions[match.id].points !== null && userPredictions[match.id].points !== undefined ? 'points-calculated' : 'points-pending'}`}>
-                            {userPredictions[match.id].points !== null && userPredictions[match.id].points !== undefined
-                              ? `${userPredictions[match.id].points} ${userPredictions[match.id].points === 1 ? 'point' : 'points'}`
-                              : 'Points pending'}
+                      <div className="compact-result-row">
+                        <div className="compact-result">
+                          <span className="compact-result-label">Result</span>
+                          <span className="compact-result-score">
+                            {match.homeScore !== null && match.awayScore !== null 
+                              ? `${match.homeScore} - ${match.awayScore}`
+                              : 'N/A'}
                           </span>
                         </div>
-                      )}
+                        {userPredictions[match.id] && (
+                          <div className="compact-points-container">
+                            <span 
+                              className={`compact-points ${userPredictions[match.id].points !== null && userPredictions[match.id].points !== undefined ? `points-${userPredictions[match.id].points}` : 'points-pending'}`}
+                              data-points={userPredictions[match.id].points}
+                            >
+                              {userPredictions[match.id].points !== null && userPredictions[match.id].points !== undefined
+                                ? `${userPredictions[match.id].points} ${userPredictions[match.id].points === 1 ? 'pt' : 'pts'}`
+                                : 'Pending'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -572,6 +642,15 @@ const Matches = () => {
                               ? `${prediction.homeScore} - ${prediction.awayScore}`
                               : 'No prediction'}
                           </span>
+                        </div>
+                      )}
+
+                      {/* Result type indicator for finished matches */}
+                      {isFinished && isExpanded && resultType && (
+                        <div className={`result-type-badge result-type-${resultType}`}>
+                          {resultType === 'exact' && '🎯 Exact Score!'}
+                          {resultType === 'correct-winner' && '✅ Correct Winner'}
+                          {resultType === 'wrong' && '❌ Wrong Prediction'}
                         </div>
                       )}
                     </>
@@ -638,7 +717,7 @@ const Matches = () => {
                       {userPredictions[match.id] && (
                         <div className="points-display">
                           <span className="points-label">Points Earned</span>
-                          <span className={`points-badge ${userPredictions[match.id].points !== null && userPredictions[match.id].points !== undefined ? 'points-calculated' : 'points-pending'}`}>
+                          <span className={`points-badge ${userPredictions[match.id].points !== null && userPredictions[match.id].points !== undefined ? `points-${userPredictions[match.id].points}` : 'points-pending'}`}>
                             {userPredictions[match.id].points !== null && userPredictions[match.id].points !== undefined
                               ? `${userPredictions[match.id].points} ${userPredictions[match.id].points === 1 ? 'point' : 'points'}`
                               : (
