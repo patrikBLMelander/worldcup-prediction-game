@@ -317,6 +317,24 @@
   animation: pulse 1s infinite;
 }
 
+.live-indicator {
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  animation: pulse 2s infinite;
+}
+
+.mobile-header-timer .live-indicator {
+  font-size: 0.75rem;
+  padding: 3px 6px;
+}
+
 .desktop-header-points {
   margin-left: auto;
   font-size: 0.85rem;
@@ -867,13 +885,19 @@
 }
 
 .match-group {
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   color: var(--text-secondary);
   font-weight: 600;
   padding: var(--spacing-xs) var(--spacing-md);
   background: var(--surface-elevated);
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
+}
+
+@media (max-width: 768px) {
+  .match-group {
+    font-size: 0.7rem;
+  }
 }
 
 .match-teams {

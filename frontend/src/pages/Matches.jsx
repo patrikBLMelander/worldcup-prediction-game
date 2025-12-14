@@ -542,9 +542,8 @@ const Matches = () => {
                 <div key={match.id} className={`match-card ${isFinished ? 'finished-match' : ''} ${isCollapsed ? 'collapsed' : ''} ${isMobile ? 'mobile-view' : ''} ${activeTab === 'results' ? 'results-view' : 'upcoming-view'} ${resultType ? `result-${resultType}` : ''} ${timeRemainingClass}`}>
                   <div className="match-header">
                     <div className="match-header-left">
-                      <span className={`match-status status-${match.status.toLowerCase()} ${isMobile ? 'mobile-header-text' : 'desktop-header-text'}`}>{match.status}</span>
                       <span className={`match-group ${isMobile ? 'mobile-header-text' : 'desktop-header-text'}`}>{match.group}</span>
-                      {/* Timer in header for scheduled matches, Points for finished matches */}
+                      {/* Timer for scheduled matches, LIVE text for live matches, Points for finished matches */}
                       {match.status === 'SCHEDULED' && (
                         <div className={isMobile ? 'mobile-header-timer' : 'desktop-header-timer'}>
                           <CountdownTimer 
@@ -553,6 +552,11 @@ const Matches = () => {
                             matchId={match.id}
                             onExpired={handleCountdownExpired}
                           />
+                        </div>
+                      )}
+                      {match.status === 'LIVE' && (
+                        <div className={isMobile ? 'mobile-header-timer' : 'desktop-header-timer'}>
+                          <span className="live-indicator">LIVE</span>
                         </div>
                       )}
                       {isFinished && prediction && (
