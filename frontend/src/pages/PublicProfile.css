@@ -185,17 +185,187 @@
 }
 
 .prediction-card {
-  background: var(--surface-elevated);
-  padding: var(--spacing-xl);
-  border-radius: var(--radius-lg);
+  background: var(--surface);
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-xl);
   border: 1px solid var(--border);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
   transition: all var(--transition-base);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: auto;
 }
 
 .prediction-card:hover {
-  transform: translateX(4px);
-  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
   border-color: var(--primary-500);
+}
+
+/* Match header styles for public profile */
+.prediction-card .match-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 2px solid var(--border);
+}
+
+.prediction-card .match-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.prediction-card .match-status {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.prediction-card .match-status.status-finished {
+  background: #22c55e;
+  color: white;
+}
+
+.prediction-card .match-group {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  opacity: 0.9;
+}
+
+.prediction-card .header-points {
+  margin-left: auto;
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.prediction-card .header-points-badge {
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.3px;
+}
+
+.prediction-card .header-points-badge.points-0 {
+  background: #ef4444;
+  color: white;
+}
+
+.prediction-card .header-points-badge.points-1 {
+  background: #eab308;
+  color: white;
+}
+
+.prediction-card .header-points-badge.points-3 {
+  background: #22c55e;
+  color: white;
+}
+
+.prediction-card .header-points-badge.points-pending {
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+/* Match compact layout for public profile */
+.prediction-card .match-compact {
+  margin: var(--spacing-md) 0;
+}
+
+.prediction-card .compact-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--spacing-md);
+  flex-wrap: nowrap;
+  font-size: 1rem;
+  width: 100%;
+}
+
+.prediction-card .team-logo {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.prediction-card .team-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  flex-shrink: 1;
+  min-width: 0;
+  font-size: 1rem;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+  text-align: center;
+}
+
+.prediction-card .vs {
+  color: var(--text-secondary);
+  font-weight: 500;
+  flex-shrink: 0;
+  margin: 0 var(--spacing-sm);
+  font-size: 1rem;
+}
+
+.prediction-card .score {
+  color: var(--text-primary);
+  font-weight: 700;
+  flex-shrink: 0;
+  font-size: 1rem;
+}
+
+.prediction-card .prediction-result {
+  margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.prediction-card .prediction-result.points-0 {
+  color: #ef4444;
+}
+
+.prediction-card .prediction-result.points-1 {
+  color: #eab308;
+}
+
+.prediction-card .prediction-result.points-3 {
+  color: #22c55e;
+}
+
+.prediction-card .prediction-result.points-pending {
+  color: var(--text-secondary);
+}
+
+.prediction-card .no-prediction {
+  color: var(--text-tertiary);
+  font-style: italic;
+  margin-left: auto;
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  white-space: nowrap;
 }
 
 .prediction-header {
@@ -346,7 +516,7 @@
 
 @media (max-width: 768px) {
   .public-profile-container {
-    padding: var(--spacing-lg) var(--spacing-md);
+    padding: var(--spacing-lg) var(--spacing-sm);
   }
 
   .public-profile-header h1 {
@@ -371,37 +541,89 @@
   }
 
   .profile-section {
-    padding: var(--spacing-lg);
+    padding: var(--spacing-md);
+  }
+
+  .predictions-list {
+    gap: var(--spacing-md);
+  }
+
+  .prediction-card {
+    padding: var(--spacing-md);
+    margin: 0;
   }
 
   .statistics-grid {
     grid-template-columns: 1fr;
   }
 
-  .prediction-header {
-    flex-direction: column;
+  /* Match card styles for mobile */
+  .prediction-card .match-header {
+    margin-bottom: var(--spacing-xs);
+    padding-bottom: var(--spacing-xs);
   }
 
-  .prediction-result {
-    align-items: flex-start;
+  .prediction-card .match-header-left {
+    gap: var(--spacing-xs);
   }
 
-  .match-teams {
-    flex-direction: column;
-    align-items: flex-start;
+  .prediction-card .match-status,
+  .prediction-card .match-group {
+    font-size: 0.7rem;
+    opacity: 0.85;
   }
 
-  .score-divider {
-    display: none;
+  .prediction-card .header-points {
+    font-size: 0.7rem;
+    opacity: 0.85;
   }
 
-  .score-comparison {
-    flex-direction: column;
-    align-items: flex-start;
+  .prediction-card .header-points-badge {
+    font-size: 0.7rem;
+    padding: 2px 6px;
   }
 
-  .score-arrow {
-    transform: rotate(90deg);
+  .prediction-card .match-compact {
+    margin: var(--spacing-xs) 0 0 0;
+  }
+
+  .prediction-card {
+    padding: var(--spacing-md);
+    margin: 0;
+  }
+
+  .prediction-card .match-header {
+    margin-bottom: var(--spacing-xs);
+    padding-bottom: var(--spacing-xs);
+  }
+
+  .prediction-card .compact-row {
+    gap: var(--spacing-sm);
+    font-size: 0.9rem;
+  }
+
+  .prediction-card .team-logo {
+    width: 24px;
+    height: 24px;
+  }
+
+  .prediction-card .team-name {
+    font-size: clamp(0.7rem, 2.5vw, 0.9rem);
+    max-width: 100px;
+  }
+
+  .prediction-card .score {
+    font-size: 0.9rem;
+  }
+
+  .prediction-card .vs {
+    font-size: 0.9rem;
+    margin: 0 var(--spacing-xs);
+  }
+
+  .prediction-card .prediction-result {
+    font-size: 0.9rem;
+    padding: 2px 6px;
   }
 }
 

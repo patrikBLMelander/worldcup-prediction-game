@@ -349,11 +349,12 @@
   }
 
   .leaderboard-row {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--spacing-md);
     padding: var(--spacing-md);
     border-bottom: 1px solid var(--border);
+    align-items: center;
   }
 
   .leaderboard-row:hover {
@@ -361,68 +362,65 @@
   }
 
   .mobile-label {
-    display: inline-block;
+    display: none;
   }
 
   .rank-col {
-    order: 1;
-    justify-content: flex-start;
-    align-self: flex-start;
     display: flex;
     align-items: center;
-    gap: var(--spacing-xs);
+    justify-content: center;
   }
 
   .rank-icon {
-    font-size: 1.75rem;
-  }
-
-  .rank-number {
-    font-size: 1rem;
-  }
-
-  .player-col {
-    order: 2;
-    flex-wrap: wrap;
-    gap: var(--spacing-xs);
-    display: flex;
-    align-items: center;
-  }
-
-  .player-name {
-    font-size: 1rem;
-  }
-
-  .you-badge {
-    font-size: 0.7rem;
-    padding: var(--spacing-xs) var(--spacing-sm);
-  }
-
-  .points-col {
-    order: 3;
-    justify-content: flex-start;
-    align-self: flex-start;
-    display: flex;
-    align-items: baseline;
-    gap: var(--spacing-xs);
-  }
-
-  .points-value {
     font-size: 1.5rem;
   }
 
-  .points-label {
-    font-size: 0.8rem;
+  .rank-number {
+    font-size: 0.9rem;
+    font-weight: 700;
   }
 
-  .predictions-col {
-    order: 4;
-    text-align: left;
-    align-self: flex-start;
-    font-size: 0.9rem;
+  .player-col {
     display: flex;
     align-items: center;
     gap: var(--spacing-xs);
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .player-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .you-badge {
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    flex-shrink: 0;
+  }
+
+  .points-col {
+    display: flex;
+    align-items: baseline;
+    gap: 2px;
+    justify-content: flex-end;
+  }
+
+  .points-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .points-label {
+    font-size: 0.7rem;
+    color: var(--text-tertiary);
+  }
+
+  .predictions-col {
+    display: none;
   }
 
   .leaderboard-stats {

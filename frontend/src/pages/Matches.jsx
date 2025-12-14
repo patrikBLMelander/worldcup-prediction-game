@@ -22,8 +22,21 @@ const Matches = () => {
   const [predictionInputs, setPredictionInputs] = useState({});
   const [savingStates, setSavingStates] = useState({});
   const [expandedFinishedMatches, setExpandedFinishedMatches] = useState(new Set());
+  const [expandedMobileMatches, setExpandedMobileMatches] = useState(new Set()); // Track expanded matches on mobile
+  const [isMobile, setIsMobile] = useState(false);
   const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming' or 'results'
   const debounceTimers = useRef({});
+
+  // Detect mobile viewport
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Fetch predictions with points for finished matches
   const fetchPredictions = useCallback(async () => {
@@ -474,7 +487,11 @@ const Matches = () => {
               const homeLogoUrl = match.homeTeamCrest || getFlagUrl(match.homeTeam);
               const awayLogoUrl = match.awayTeamCrest || getFlagUrl(match.awayTeam);
               const isFinished = match.status === 'FINISHED';
-              const isExpanded = expandedFinishedMatches.has(match.id);
+              const isExpandedDesktop = expandedFinishedMatches.has(match.id);
+              // All matches are always collapsed (compact view) - same as mobile
+              // Only finished matches can be expanded to show details
+              const isExpanded = isFinished ? isExpandedDesktop : false;
+              const isCollapsed = !isExpanded;
               
               // Determine result type for finished matches
               let resultType = null;
@@ -489,214 +506,182 @@ const Matches = () => {
                 }
               }
 
+              // Check if prediction has a winner (points > 0) - only for finished matches
+              const hasWinner = isFinished && prediction && prediction.points !== null && prediction.points !== undefined && prediction.points > 0;
+
+              // Calculate time remaining for scheduled matches (for color coding)
+              let timeRemainingClass = '';
+              if (match.status === 'SCHEDULED' && match.matchDate) {
+                // Check if already predicted
+                const hasPrediction = prediction && prediction.homeScore !== undefined && prediction.awayScore !== undefined;
+                
+                if (hasPrediction) {
+                  timeRemainingClass = 'time-predicted'; // Green for already predicted
+                } else {
+                  const dateStr = match.matchDate;
+                  const matchTime = dateStr.endsWith('Z') 
+                    ? new Date(dateStr)
+                    : new Date(dateStr + 'Z');
+                  const now = new Date();
+                  const diffMs = matchTime - now;
+                  const diffHours = diffMs / (1000 * 60 * 60);
+                  
+                  if (diffHours < 1) {
+                    timeRemainingClass = 'time-very-soon'; // < 1 hour
+                  } else if (diffHours < 12) {
+                    timeRemainingClass = 'time-soon'; // < 12 hours
+                  } else if (diffHours < 24) {
+                    timeRemainingClass = 'time-medium'; // < 1 day
+                  } else {
+                    timeRemainingClass = 'time-far'; // > 1 day
+                  }
+                }
+              }
+
               return (
-                <div key={match.id} className={`match-card ${isFinished ? 'finished-match' : ''} ${isFinished && !isExpanded ? 'collapsed' : ''} ${activeTab === 'results' ? 'results-view' : 'upcoming-view'} ${resultType ? `result-${resultType}` : ''}`}>
+                <div key={match.id} className={`match-card ${isFinished ? 'finished-match' : ''} ${isCollapsed ? 'collapsed' : ''} ${isMobile ? 'mobile-view' : ''} ${activeTab === 'results' ? 'results-view' : 'upcoming-view'} ${resultType ? `result-${resultType}` : ''} ${timeRemainingClass}`}>
                   <div className="match-header">
                     <div className="match-header-left">
-                      <span className={`match-status status-${match.status.toLowerCase()}`}>{match.status}</span>
-                      <span className="match-group">{match.group}</span>
+                      <span className={`match-status status-${match.status.toLowerCase()} ${isMobile ? 'mobile-header-text' : 'desktop-header-text'}`}>{match.status}</span>
+                      <span className={`match-group ${isMobile ? 'mobile-header-text' : 'desktop-header-text'}`}>{match.group}</span>
+                      {/* Timer in header for scheduled matches, Points for finished matches */}
+                      {match.status === 'SCHEDULED' && (
+                        <div className={isMobile ? 'mobile-header-timer' : 'desktop-header-timer'}>
+                          <CountdownTimer 
+                            matchDate={match.matchDate} 
+                            status={match.status}
+                            matchId={match.id}
+                            onExpired={handleCountdownExpired}
+                          />
+                        </div>
+                      )}
+                      {isFinished && prediction && (
+                        <div className={isMobile ? 'mobile-header-points' : 'desktop-header-points'}>
+                          {prediction.points !== null && prediction.points !== undefined ? (
+                            <span className={`header-points-badge points-${prediction.points}`}>
+                              {prediction.points === 1 ? '1 pt' : `${prediction.points} pts`}
+                            </span>
+                          ) : (
+                            <span className="header-points-badge points-pending">Pending</span>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    {isFinished && (
-                      <button
-                        className="expand-toggle"
-                        onClick={() => {
-                          setExpandedFinishedMatches(prev => {
-                            const newSet = new Set(prev);
-                            if (newSet.has(match.id)) {
-                              newSet.delete(match.id);
-                            } else {
-                              newSet.add(match.id);
+                  </div>
+                  
+                  {/* Compact centered layout for all matches */}
+                  <div className={`match-compact ${isMobile ? 'mobile-match-compact' : 'desktop-match-compact'}`}>
+                    <div className={`compact-row ${isMobile ? 'mobile-compact-row' : 'desktop-compact-row'}`}>
+                      {isFinished ? (
+                        // Finished match: [Logo] Team1 [Score1] vs [Score2] Team2 [Logo] [Prediction]
+                        <>
+                          <img src={homeLogoUrl} alt={match.homeTeam} className={isMobile ? 'mobile-team-logo' : 'desktop-team-logo'} onError={(e) => {
+                            if (match.homeTeamCrest) {
+                              e.target.src = getFlagUrl(match.homeTeam);
                             }
-                            return newSet;
-                          });
-                        }}
-                        aria-label={isExpanded ? 'Collapse' : 'Expand'}
-                      >
-                        {isExpanded ? '▼' : '▶'}
-                      </button>
+                          }} />
+                          <span className={isMobile ? 'mobile-team-name' : 'desktop-team-name'}>{match.homeTeam}</span>
+                          {match.homeScore !== null && match.awayScore !== null && (
+                            <span className={isMobile ? 'mobile-score' : 'desktop-score'}>{match.homeScore}</span>
+                          )}
+                          <span className={isMobile ? 'mobile-vs' : 'desktop-vs'}>vs</span>
+                          {match.homeScore !== null && match.awayScore !== null && (
+                            <span className={isMobile ? 'mobile-score' : 'desktop-score'}>{match.awayScore}</span>
+                          )}
+                          <span className={isMobile ? 'mobile-team-name' : 'desktop-team-name'}>{match.awayTeam}</span>
+                          <img src={awayLogoUrl} alt={match.awayTeam} className={isMobile ? 'mobile-team-logo' : 'desktop-team-logo'} onError={(e) => {
+                            if (match.awayTeamCrest) {
+                              e.target.src = getFlagUrl(match.awayTeam);
+                            }
+                          }} />
+                          {prediction && prediction.homeScore !== undefined && prediction.awayScore !== undefined ? (
+                            <span className={`${isMobile ? 'mobile-prediction-result' : 'desktop-prediction-result'} ${prediction.points !== null && prediction.points !== undefined ? `points-${prediction.points}` : 'points-pending'}`}>
+                              ({prediction.homeScore}-{prediction.awayScore})
+                            </span>
+                          ) : (
+                            <span className={isMobile ? 'mobile-no-prediction' : 'desktop-no-prediction'}>No prediction</span>
+                          )}
+                        </>
+                      ) : (
+                        // Scheduled matches or desktop: original layout
+                        <>
+                          <div className={isMobile ? 'mobile-team' : 'desktop-team'}>
+                            <img src={homeLogoUrl} alt={match.homeTeam} className={isMobile ? 'mobile-team-logo' : 'desktop-team-logo'} onError={(e) => {
+                              if (match.homeTeamCrest) {
+                                e.target.src = getFlagUrl(match.homeTeam);
+                              }
+                            }} />
+                            <span className={isMobile ? 'mobile-team-name' : 'desktop-team-name'}>{match.homeTeam}</span>
+                          </div>
+                          {match.status === 'SCHEDULED' ? (
+                            <>
+                              <input
+                                type="number"
+                                min="0"
+                                max="20"
+                                className={isMobile ? 'mobile-prediction-input' : 'desktop-prediction-input'}
+                                value={predictionInputs[match.id]?.homeScore ?? ''}
+                                onChange={(e) => handlePredictionChange(match.id, 'homeScore', e.target.value)}
+                                placeholder="-"
+                              />
+                              <span className={isMobile ? 'mobile-vs' : 'desktop-vs'}>-</span>
+                              <input
+                                type="number"
+                                min="0"
+                                max="20"
+                                className={isMobile ? 'mobile-prediction-input' : 'desktop-prediction-input'}
+                                value={predictionInputs[match.id]?.awayScore ?? ''}
+                                onChange={(e) => handlePredictionChange(match.id, 'awayScore', e.target.value)}
+                                placeholder="-"
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <span className={isMobile ? 'mobile-vs' : 'desktop-vs'}>vs</span>
+                              {(match.status === 'FINISHED' || match.status === 'LIVE') && match.homeScore !== null && match.awayScore !== null && (
+                                <span className={isMobile ? 'mobile-score' : 'desktop-score'}>{match.homeScore} - {match.awayScore}</span>
+                              )}
+                            </>
+                          )}
+                          <div className={isMobile ? 'mobile-team' : 'desktop-team'}>
+                            <img src={awayLogoUrl} alt={match.awayTeam} className={isMobile ? 'mobile-team-logo' : 'desktop-team-logo'} onError={(e) => {
+                              if (match.awayTeamCrest) {
+                                e.target.src = getFlagUrl(match.awayTeam);
+                              }
+                            }} />
+                            <span className={isMobile ? 'mobile-team-name' : 'desktop-team-name'}>{match.awayTeam}</span>
+                          </div>
+                          {match.status !== 'SCHEDULED' && (
+                            prediction && prediction.homeScore !== undefined && prediction.awayScore !== undefined ? (
+                              <span className={`${isMobile ? 'mobile-prediction' : 'desktop-prediction'} ${hasWinner ? 'has-winner' : ''}`}>
+                                ({prediction.homeScore}-{prediction.awayScore})
+                              </span>
+                            ) : (
+                              <span className={isMobile ? 'mobile-no-prediction' : 'desktop-no-prediction'}>No prediction</span>
+                            )
+                          )}
+                        </>
+                      )}
+                    </div>
+                    
+                    {/* Prediction status for scheduled matches */}
+                    {match.status === 'SCHEDULED' && (
+                      <div className={isMobile ? 'mobile-match-actions' : 'desktop-match-actions'}>
+                        {savingStates[match.id] === 'saving' && (
+                          <span className="prediction-status saving">💾 Saving...</span>
+                        )}
+                        {savingStates[match.id] === 'saved' && (
+                          <span className="prediction-status saved">✓ Saved</span>
+                        )}
+                        {savingStates[match.id] === 'error' && (
+                          <span className="prediction-status error">✗ Error saving</span>
+                        )}
+                      </div>
                     )}
                   </div>
-                  
-                  <div className="match-teams">
-                    <div className="team">
-                      <div className="team-name">
-                        <img src={homeLogoUrl} alt={match.homeTeam} className="team-logo" onError={(e) => {
-                          // Fallback to flag if logo fails to load
-                          if (match.homeTeamCrest) {
-                            e.target.src = getFlagUrl(match.homeTeam);
-                          }
-                        }} />
-                        <span>{match.homeTeam}</span>
-                        {/* Show live/actual score inline if available */}
-                        {(match.status === 'FINISHED' || match.status === 'LIVE') && match.homeScore !== null && (
-                          <span className="team-score">{match.homeScore}</span>
-                        )}
-                      </div>
-                      {/* Show prediction input only if match is scheduled (not LIVE or FINISHED) */}
-                      {match.status === 'SCHEDULED' && (
-                        <div className="prediction-input-wrapper">
-                          <input
-                            type="number"
-                            min="0"
-                            max="20"
-                            className="prediction-input"
-                            value={predictionInputs[match.id]?.homeScore ?? ''}
-                            onChange={(e) => handlePredictionChange(match.id, 'homeScore', e.target.value)}
-                            placeholder="-"
-                          />
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="match-vs">vs</div>
-                    
-                    <div className="team">
-                      <div className="team-name">
-                        <img src={awayLogoUrl} alt={match.awayTeam} className="team-logo" onError={(e) => {
-                          // Fallback to flag if logo fails to load
-                          if (match.awayTeamCrest) {
-                            e.target.src = getFlagUrl(match.awayTeam);
-                          }
-                        }} />
-                        <span>{match.awayTeam}</span>
-                        {/* Show live/actual score inline if available */}
-                        {(match.status === 'FINISHED' || match.status === 'LIVE') && match.awayScore !== null && (
-                          <span className="team-score">{match.awayScore}</span>
-                        )}
-                      </div>
-                      {/* Show prediction input only if match is scheduled (not LIVE or FINISHED) */}
-                      {match.status === 'SCHEDULED' && (
-                        <div className="prediction-input-wrapper">
-                          <input
-                            type="number"
-                            min="0"
-                            max="20"
-                            className="prediction-input"
-                            value={predictionInputs[match.id]?.awayScore ?? ''}
-                            onChange={(e) => handlePredictionChange(match.id, 'awayScore', e.target.value)}
-                            placeholder="-"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Collapsed view for finished matches - show only essential info */}
-                  {isFinished && !isExpanded && (
-                    <div className="finished-match-compact">
-                      <div className="compact-result-row">
-                        <div className="compact-result">
-                          <span className="compact-result-label">Result</span>
-                          <span className="compact-result-score">
-                            {match.homeScore !== null && match.awayScore !== null 
-                              ? `${match.homeScore} - ${match.awayScore}`
-                              : 'N/A'}
-                          </span>
-                        </div>
-                        {userPredictions[match.id] && (
-                          <div className="compact-points-container">
-                            <span 
-                              className={`compact-points ${userPredictions[match.id].points !== null && userPredictions[match.id].points !== undefined ? `points-${userPredictions[match.id].points}` : 'points-pending'}`}
-                              data-points={userPredictions[match.id].points}
-                            >
-                              {userPredictions[match.id].points !== null && userPredictions[match.id].points !== undefined
-                                ? `${userPredictions[match.id].points} ${userPredictions[match.id].points === 1 ? 'pt' : 'pts'}`
-                                : 'Pending'}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Expanded content - only show when expanded or not finished */}
-                  {(isExpanded || !isFinished) && (
-                    <>
-                      <div className="match-info">
-                        <div className="match-date">
-                          {(() => {
-                            // Parse date string as UTC (backend stores as UTC LocalDateTime)
-                            const dateStr = match.matchDate;
-                            const utcDate = dateStr.endsWith('Z') 
-                              ? new Date(dateStr)
-                              : new Date(dateStr + 'Z'); // Append Z if not present to treat as UTC
-                            return utcDate.toLocaleString('en-US', {
-                              weekday: 'short',
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              timeZone: 'UTC'
-                            });
-                          })()}
-                        </div>
-                      </div>
-
-                      {/* Show prediction summary for LIVE or FINISHED matches */}
-                      {(match.status === 'LIVE' || match.status === 'FINISHED') && (
-                        <div className="prediction-summary">
-                          <span className="prediction-summary-label">Your Prediction:</span>
-                          <span className="prediction-summary-score">
-                            {prediction && prediction.homeScore !== undefined && prediction.awayScore !== undefined
-                              ? `${prediction.homeScore} - ${prediction.awayScore}`
-                              : 'No prediction'}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Result type indicator for finished matches */}
-                      {isFinished && isExpanded && resultType && (
-                        <div className={`result-type-badge result-type-${resultType}`}>
-                          {resultType === 'exact' && '🎯 Exact Score!'}
-                          {resultType === 'correct-winner' && '✅ Correct Winner'}
-                          {resultType === 'wrong' && '❌ Wrong Prediction'}
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  {/* Countdown timer at bottom center - show for scheduled matches */}
-                  {match.status === 'SCHEDULED' && (
-                    <div className="countdown-wrapper-bottom">
-                      <CountdownTimer 
-                        matchDate={match.matchDate} 
-                        status={match.status}
-                        matchId={match.id}
-                        onExpired={handleCountdownExpired}
-                      />
-                    </div>
-                  )}
-
-                  {/* Prediction status for scheduled matches */}
-                  {match.status === 'SCHEDULED' && (
-                    <div className="match-actions">
-                      {savingStates[match.id] === 'saving' && (
-                        <span className="prediction-status saving">💾 Saving...</span>
-                      )}
-                      {savingStates[match.id] === 'saved' && (
-                        <span className="prediction-status saved">✓ Saved</span>
-                      )}
-                      {savingStates[match.id] === 'error' && (
-                        <span className="prediction-status error">✗ Error saving</span>
-                      )}
-                      {!savingStates[match.id] && predictionInputs[match.id]?.homeScore && predictionInputs[match.id]?.awayScore && (
-                        <span className="prediction-status">Enter scores above to save</span>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* Locked message for live or finished matches - only show when expanded */}
-                  {(match.status === 'LIVE' || (match.status === 'FINISHED' && isExpanded)) && (
-                    <div className="match-actions">
-                      <span className="prediction-status locked">
-                        {match.status === 'LIVE' ? '🔒 Predictions locked - Match is LIVE' : '🔒 Predictions locked - Match is FINISHED'}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Results summary for finished matches - only show when expanded */}
-                  {match.status === 'FINISHED' && isExpanded && (
+                  {/* Results summary for finished matches - only show when expanded on desktop */}
+                  {!isMobile && match.status === 'FINISHED' && isExpanded && (
                     <div className="match-result-summary">
                       <div className="result-comparison">
                         <div className="result-row">

@@ -114,7 +114,6 @@ const Leaderboard = () => {
                   }}
                 >
                   <div className="rank-col">
-                    <span className="mobile-label">Rank:</span>
                     {rankIcon ? (
                       <span className="rank-icon">{rankIcon}</span>
                     ) : (
@@ -122,19 +121,16 @@ const Leaderboard = () => {
                     )}
                   </div>
                   <div className="player-col">
-                    <span className="mobile-label">Player:</span>
                     <span className="player-name">
                       {entry.screenName || entry.email}
                     </span>
                     {isCurrentUser && <span className="you-badge">You</span>}
                   </div>
                   <div className="points-col">
-                    <span className="mobile-label">Points:</span>
                     <span className="points-value">{entry.totalPoints || 0}</span>
                     <span className="points-label">pts</span>
                   </div>
                   <div className="predictions-col">
-                    <span className="mobile-label">Predictions:</span>
                     <span className="predictions-count">{entry.predictionCount || 0}</span>
                   </div>
                 </div>

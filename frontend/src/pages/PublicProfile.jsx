@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../config/api';
 import Navigation from '../components/Navigation';
+import { getFlagUrl } from '../utils/countryFlags';
 import './PublicProfile.css';
 
 const PublicProfile = () => {
@@ -31,17 +32,12 @@ const PublicProfile = () => {
     }
   }, [userId]);
 
-  const getResultTypeBadge = (resultType) => {
-    switch (resultType) {
-      case 'EXACT':
-        return <span className="badge badge-exact">🎯 Exact Score</span>;
-      case 'CORRECT_WINNER':
-        return <span className="badge badge-correct">✓ Correct Winner</span>;
-      case 'WRONG':
-        return <span className="badge badge-wrong">✗ Wrong</span>;
-      default:
-        return null;
-    }
+  const getPointsColor = (points) => {
+    if (points === null || points === undefined) return 'pending';
+    if (points === 0) return '0';
+    if (points === 1) return '1';
+    if (points === 3) return '3';
+    return 'pending';
   };
 
   const formatDate = (dateString) => {
@@ -179,67 +175,74 @@ const PublicProfile = () => {
           <h2>🎮 Finished Predictions</h2>
           {profile.finishedPredictions && profile.finishedPredictions.length > 0 ? (
             <div className="predictions-list">
-              {profile.finishedPredictions.map((prediction) => (
-                <div key={prediction.matchId} className="prediction-card">
-                  <div className="prediction-header">
-                    <div className="match-info">
-                      <div className="match-teams">
-                        <div className="team">
-                          {prediction.homeTeamCrest && (
-                            <img
-                              src={prediction.homeTeamCrest}
-                              alt={prediction.homeTeam}
-                              className="team-crest"
-                            />
-                          )}
-                          <span className="team-name">{prediction.homeTeam}</span>
-                        </div>
-                        <div className="score-divider">vs</div>
-                        <div className="team">
-                          {prediction.awayTeamCrest && (
-                            <img
-                              src={prediction.awayTeamCrest}
-                              alt={prediction.awayTeam}
-                              className="team-crest"
-                            />
-                          )}
-                          <span className="team-name">{prediction.awayTeam}</span>
-                        </div>
-                      </div>
-                      <div className="match-meta">
-                        <span className="match-date">{formatDate(prediction.matchDate)}</span>
-                        {prediction.venue && (
-                          <span className="match-venue">📍 {prediction.venue}</span>
-                        )}
-                        {prediction.group && (
-                          <span className="match-group">{prediction.group}</span>
+              {profile.finishedPredictions.map((prediction) => {
+                const homeLogoUrl = prediction.homeTeamCrest || getFlagUrl(prediction.homeTeam);
+                const awayLogoUrl = prediction.awayTeamCrest || getFlagUrl(prediction.awayTeam);
+                const pointsColor = getPointsColor(prediction.points);
+                
+                return (
+                  <div key={prediction.matchId} className="prediction-card match-card results-view">
+                    <div className="match-header">
+                      <div className="match-header-left">
+                        <span className="match-status status-finished">FINISHED</span>
+                        <span className="match-group">{prediction.group || 'Match'}</span>
+                        {prediction.points !== null && prediction.points !== undefined ? (
+                          <div className="header-points">
+                            <span className={`header-points-badge points-${pointsColor}`}>
+                              {prediction.points === 1 ? '1 pt' : `${prediction.points} pts`}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="header-points">
+                            <span className="header-points-badge points-pending">Pending</span>
+                          </div>
                         )}
                       </div>
                     </div>
-                    <div className="prediction-result">
-                      {getResultTypeBadge(prediction.resultType)}
-                      <div className="points-earned">+{prediction.points} pts</div>
+                    
+                    <div className="match-compact">
+                      <div className="compact-row">
+                        <img 
+                          src={homeLogoUrl} 
+                          alt={prediction.homeTeam} 
+                          className="team-logo" 
+                          onError={(e) => {
+                            if (prediction.homeTeamCrest) {
+                              e.target.src = getFlagUrl(prediction.homeTeam);
+                            }
+                          }} 
+                        />
+                        <span className="team-name">{prediction.homeTeam}</span>
+                        {prediction.actualHomeScore !== null && prediction.actualAwayScore !== null && (
+                          <span className="score">{prediction.actualHomeScore}</span>
+                        )}
+                        <span className="vs">vs</span>
+                        {prediction.actualHomeScore !== null && prediction.actualAwayScore !== null && (
+                          <span className="score">{prediction.actualAwayScore}</span>
+                        )}
+                        <span className="team-name">{prediction.awayTeam}</span>
+                        <img 
+                          src={awayLogoUrl} 
+                          alt={prediction.awayTeam} 
+                          className="team-logo" 
+                          onError={(e) => {
+                            if (prediction.awayTeamCrest) {
+                              e.target.src = getFlagUrl(prediction.awayTeam);
+                            }
+                          }} 
+                        />
+                        {prediction.predictedHomeScore !== undefined && prediction.predictedAwayScore !== undefined ? (
+                          <span className={`prediction-result points-${pointsColor}`}>
+                            ({prediction.predictedHomeScore}-{prediction.predictedAwayScore})
+                          </span>
+                        ) : (
+                          <span className="no-prediction">No prediction</span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  <div className="prediction-scores">
-                    <div className="score-comparison">
-                      <div className="score-item">
-                        <span className="score-label">Predicted</span>
-                        <span className="score-value">
-                          {prediction.predictedHomeScore} - {prediction.predictedAwayScore}
-                        </span>
-                      </div>
-                      <div className="score-arrow">→</div>
-                      <div className="score-item">
-                        <span className="score-label">Actual</span>
-                        <span className="score-value actual">
-                          {prediction.actualHomeScore} - {prediction.actualAwayScore}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p className="section-description">
