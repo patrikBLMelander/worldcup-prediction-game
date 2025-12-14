@@ -187,18 +187,45 @@ public class UserController {
         // Get statistics for finished matches only
         PredictionStatisticsDTO statistics = predictionService.getPredictionStatistics(user);
         
-        // Get finished predictions (only for matches with status FINISHED)
-        List<Prediction> allPredictions = predictionRepository.findByUser(user);
+        // Get finished predictions - ONLY show predictions for matches that are LIVE or FINISHED
+        // Never show predictions for SCHEDULED matches (even if they have scores somehow)
+        // Use JOIN FETCH to ensure match data is loaded
+        List<Prediction> allPredictions = predictionRepository.findByUserWithMatch(user);
         List<FinishedPredictionDTO> finishedPredictions = allPredictions.stream()
-                .filter(p -> p.getMatch().getStatus() == MatchStatus.FINISHED &&
-                           p.getMatch().getHomeScore() != null &&
-                           p.getMatch().getAwayScore() != null &&
-                           p.getPoints() != null) // Only show predictions that have been scored
+                .filter(p -> {
+                    Match match = p.getMatch();
+                    if (match == null) return false;
+                    
+                    // CRITICAL: Only show predictions for LIVE or FINISHED matches
+                    // Never show predictions for SCHEDULED matches (game hasn't started yet)
+                    MatchStatus status = match.getStatus();
+                    if (status != MatchStatus.FINISHED && status != MatchStatus.LIVE) {
+                        return false; // Don't show predictions for SCHEDULED or CANCELLED matches
+                    }
+                    
+                    // Must have scores to show the prediction
+                    boolean hasScores = match.getHomeScore() != null && match.getAwayScore() != null;
+                    return hasScores;
+                })
                 .sorted((p1, p2) -> p2.getMatch().getMatchDate().compareTo(p1.getMatch().getMatchDate())) // Most recent first
                 .map(p -> {
                     Match match = p.getMatch();
-                    String resultType;
                     Integer points = p.getPoints();
+                    
+                    // Calculate points if not already calculated
+                    if (points == null && match.getHomeScore() != null && match.getAwayScore() != null) {
+                        points = predictionService.calculatePointsForPrediction(
+                            p.getPredictedHomeScore(),
+                            p.getPredictedAwayScore(),
+                            match.getHomeScore(),
+                            match.getAwayScore()
+                        );
+                        // Save the calculated points
+                        p.setPoints(points);
+                        predictionRepository.save(p);
+                    }
+                    
+                    String resultType;
                     if (points == null || points == 0) {
                         resultType = "WRONG";
                     } else if (points == 3) {

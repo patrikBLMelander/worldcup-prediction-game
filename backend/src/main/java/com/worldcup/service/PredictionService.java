@@ -3,6 +3,7 @@ package com.worldcup.service;
 import com.worldcup.dto.PerformanceHistoryDTO;
 import com.worldcup.dto.PredictionStatisticsDTO;
 import com.worldcup.entity.Match;
+import com.worldcup.entity.MatchStatus;
 import com.worldcup.entity.Prediction;
 import com.worldcup.entity.User;
 import com.worldcup.repository.PredictionRepository;
@@ -120,15 +121,50 @@ public class PredictionService {
         return 0;
     }
 
+    /**
+     * Calculate points for a prediction (public method for use in controllers)
+     */
+    public int calculatePointsForPrediction(int predictedHome, int predictedAway,
+                                           int actualHome, int actualAway) {
+        return calculatePoints(predictedHome, predictedAway, actualHome, actualAway);
+    }
+
     public PredictionStatisticsDTO getPredictionStatistics(User user) {
-        List<Prediction> predictions = predictionRepository.findByUser(user);
+        // Use JOIN FETCH to ensure match data is loaded for filtering
+        List<Prediction> predictions = predictionRepository.findByUserWithMatch(user);
         
-        // Filter only predictions for finished matches with points calculated
+        // Filter predictions for matches that have scores
+        // CRITICAL: Only include FINISHED or LIVE matches - never SCHEDULED
+        // Calculate points on the fly if missing
         List<Prediction> finishedPredictions = predictions.stream()
-            .filter(p -> p.getPoints() != null && 
-                        p.getMatch().getStatus() == com.worldcup.entity.MatchStatus.FINISHED &&
-                        p.getMatch().getHomeScore() != null &&
-                        p.getMatch().getAwayScore() != null)
+            .filter(p -> {
+                Match match = p.getMatch();
+                if (match == null) return false;
+                
+                // Only show predictions for LIVE or FINISHED matches
+                MatchStatus status = match.getStatus();
+                if (status != MatchStatus.FINISHED && status != MatchStatus.LIVE) {
+                    return false; // Don't include SCHEDULED or CANCELLED matches
+                }
+                
+                // Must have scores
+                return match.getHomeScore() != null && match.getAwayScore() != null;
+            })
+            .map(p -> {
+                // Calculate points if not already calculated
+                if (p.getPoints() == null) {
+                    Match match = p.getMatch();
+                    int points = calculatePoints(
+                        p.getPredictedHomeScore(),
+                        p.getPredictedAwayScore(),
+                        match.getHomeScore(),
+                        match.getAwayScore()
+                    );
+                    p.setPoints(points);
+                    predictionRepository.save(p);
+                }
+                return p;
+            })
             .collect(Collectors.toList());
         
         int totalPredictions = finishedPredictions.size();
@@ -167,14 +203,41 @@ public class PredictionService {
     }
 
     public List<PerformanceHistoryDTO> getPerformanceHistory(User user) {
-        List<Prediction> predictions = predictionRepository.findByUser(user);
+        // Use JOIN FETCH to ensure match data is loaded
+        List<Prediction> predictions = predictionRepository.findByUserWithMatch(user);
         
-        // Filter only finished matches with points calculated, sorted by match date
+        // Filter predictions for matches that have scores
+        // CRITICAL: Only include FINISHED or LIVE matches - never SCHEDULED
+        // Calculate points on the fly if missing
         List<Prediction> finishedPredictions = predictions.stream()
-            .filter(p -> p.getPoints() != null && 
-                        p.getMatch().getStatus() == com.worldcup.entity.MatchStatus.FINISHED &&
-                        p.getMatch().getHomeScore() != null &&
-                        p.getMatch().getAwayScore() != null)
+            .filter(p -> {
+                Match match = p.getMatch();
+                if (match == null) return false;
+                
+                // Only show predictions for LIVE or FINISHED matches
+                MatchStatus status = match.getStatus();
+                if (status != MatchStatus.FINISHED && status != MatchStatus.LIVE) {
+                    return false; // Don't include SCHEDULED or CANCELLED matches
+                }
+                
+                // Must have scores
+                return match.getHomeScore() != null && match.getAwayScore() != null;
+            })
+            .map(p -> {
+                // Calculate points if not already calculated
+                if (p.getPoints() == null) {
+                    Match match = p.getMatch();
+                    int points = calculatePoints(
+                        p.getPredictedHomeScore(),
+                        p.getPredictedAwayScore(),
+                        match.getHomeScore(),
+                        match.getAwayScore()
+                    );
+                    p.setPoints(points);
+                    predictionRepository.save(p);
+                }
+                return p;
+            })
             .sorted((p1, p2) -> p1.getMatch().getMatchDate().compareTo(p2.getMatch().getMatchDate()))
             .collect(Collectors.toList());
         

@@ -15,6 +15,10 @@ import java.util.Optional;
 public interface PredictionRepository extends JpaRepository<Prediction, Long> {
     Optional<Prediction> findByUserAndMatch(User user, Match match);
     List<Prediction> findByUser(User user);
+    
+    @Query("SELECT p FROM Prediction p JOIN FETCH p.match WHERE p.user = :user")
+    List<Prediction> findByUserWithMatch(@Param("user") User user);
+    
     List<Prediction> findByMatch(Match match);
     
     @Query("SELECT COALESCE(SUM(p.points), 0) FROM Prediction p WHERE p.user = :user")
