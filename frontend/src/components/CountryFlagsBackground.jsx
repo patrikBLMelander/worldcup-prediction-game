@@ -3,15 +3,15 @@ import { teamToCountryCode } from '../utils/countryFlags';
 import './CountryFlagsBackground.css';
 
 const FLAG_CONFIG = {
-  COLS: 6,
-  ROWS: 4,
-  MIN_SIZE: 50,
-  MAX_SIZE: 80,
-  MIN_OPACITY: 0.2,
-  MAX_OPACITY: 0.4,
-  RANDOM_OFFSET: 15,
+  COLS: 8,
+  ROWS: 6,
+  MIN_SIZE: 60,
+  MAX_SIZE: 100,
+  MIN_OPACITY: 0.3,
+  MAX_OPACITY: 0.5,
+  RANDOM_OFFSET: 10,
   ROTATION_RANGE: 15,
-  DELAY_INCREMENT: 0.15
+  DELAY_INCREMENT: 0
 };
 
 const CountryFlagsBackground = () => {

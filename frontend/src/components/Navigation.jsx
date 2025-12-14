@@ -169,6 +169,13 @@ const Navigation = () => {
         <div className="mobile-menu-content">
           <div className="mobile-menu-header">
             <span className="mobile-username">{user?.screenName || user?.email}</span>
+            <button 
+              onClick={closeMenu} 
+              className="mobile-menu-close"
+              aria-label="Close menu"
+            >
+              ×
+            </button>
           </div>
           
           <nav className="mobile-menu-links" aria-label="Main navigation">

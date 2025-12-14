@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../config/api';
 import Navigation from '../components/Navigation';
+import CountdownTimer from '../components/CountdownTimer';
 import { getFlagUrl } from '../utils/countryFlags';
 import './Dashboard.css';
+import './Matches.css';
 
 const Dashboard = () => {
   const { user, updateUser } = useAuth();
@@ -49,7 +51,21 @@ const Dashboard = () => {
         // Fetch upcoming matches without predictions
         try {
           const upcomingResponse = await apiClient.get('/users/me/upcoming-matches-without-prediction');
-          setUpcomingMatches(upcomingResponse.data);
+          const allUpcoming = upcomingResponse.data;
+          
+          // Filter to only show matches starting within 2 days
+          const now = new Date();
+          const twoDaysFromNow = new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000);
+          
+          const filteredUpcoming = allUpcoming.filter(match => {
+            const dateStr = match.matchDate;
+            const matchTime = dateStr.endsWith('Z') 
+              ? new Date(dateStr)
+              : new Date(dateStr + 'Z');
+            return matchTime <= twoDaysFromNow;
+          });
+          
+          setUpcomingMatches(filteredUpcoming);
         } catch (error) {
           console.error('Failed to fetch upcoming matches:', error);
         }
@@ -120,61 +136,88 @@ const Dashboard = () => {
           <div className="upcoming-matches-section">
             <h2>Upcoming Matches Without Predictions</h2>
             <p className="section-description">
-              Don't miss out! Make predictions for these upcoming matches:
+              Don't miss out! Make predictions for these upcoming matches (within 2 days):
             </p>
-            <div className="upcoming-matches-list">
-              {upcomingMatches.slice(0, 5).map((match) => {
+            <div className="matches-grid">
+              {upcomingMatches.map((match) => {
                 const homeLogoUrl = match.homeTeamCrest || getFlagUrl(match.homeTeam);
                 const awayLogoUrl = match.awayTeamCrest || getFlagUrl(match.awayTeam);
+                
+                // Calculate time remaining for color coding
+                let timeRemainingClass = '';
+                if (match.status === 'SCHEDULED' && match.matchDate) {
+                  const dateStr = match.matchDate;
+                  const matchTime = dateStr.endsWith('Z') 
+                    ? new Date(dateStr)
+                    : new Date(dateStr + 'Z');
+                  const now = new Date();
+                  const diffMs = matchTime - now;
+                  const diffHours = diffMs / (1000 * 60 * 60);
+                  
+                  if (diffHours < 1) {
+                    timeRemainingClass = 'time-very-soon';
+                  } else if (diffHours < 12) {
+                    timeRemainingClass = 'time-soon';
+                  } else if (diffHours < 24) {
+                    timeRemainingClass = 'time-medium';
+                  } else {
+                    timeRemainingClass = 'time-far';
+                  }
+                }
+                
                 return (
                   <Link 
                     key={match.id} 
                     to="/matches" 
-                    className="upcoming-match-card"
+                    className={`match-card upcoming-view ${timeRemainingClass}`}
                   >
-                    <div className="match-teams">
-                      <div className="team-info">
-                        <img 
-                          src={homeLogoUrl} 
-                          alt={match.homeTeam} 
-                          className="team-logo-small"
-                          onError={(e) => {
-                            if (match.homeTeamCrest) {
-                              e.target.src = getFlagUrl(match.homeTeam);
-                            }
-                          }}
-                        />
-                        <span className="team-name-small">{match.homeTeam}</span>
-                      </div>
-                      <span className="vs-text">vs</span>
-                      <div className="team-info">
-                        <img 
-                          src={awayLogoUrl} 
-                          alt={match.awayTeam} 
-                          className="team-logo-small"
-                          onError={(e) => {
-                            if (match.awayTeamCrest) {
-                              e.target.src = getFlagUrl(match.awayTeam);
-                            }
-                          }}
-                        />
-                        <span className="team-name-small">{match.awayTeam}</span>
+                    <div className="match-header">
+                      <div className="match-header-left">
+                        <span className="match-status status-scheduled desktop-header-text">{match.status}</span>
+                        <span className="match-group desktop-header-text">{match.group}</span>
+                        {match.status === 'SCHEDULED' && (
+                          <div className="desktop-header-timer">
+                            <CountdownTimer 
+                              matchDate={match.matchDate} 
+                              status={match.status}
+                              matchId={match.id}
+                            />
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div className="match-date-small">
-                      {(() => {
-                        const dateStr = match.matchDate;
-                        const utcDate = dateStr.endsWith('Z') 
-                          ? new Date(dateStr)
-                          : new Date(dateStr + 'Z');
-                        return utcDate.toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          timeZone: 'UTC'
-                        });
-                      })()}
+                    
+                    <div className="match-compact desktop-match-compact">
+                      <div className="compact-row desktop-compact-row">
+                        <div className="desktop-team">
+                          <img 
+                            src={homeLogoUrl} 
+                            alt={match.homeTeam} 
+                            className="desktop-team-logo"
+                            onError={(e) => {
+                              if (match.homeTeamCrest) {
+                                e.target.src = getFlagUrl(match.homeTeam);
+                              }
+                            }}
+                          />
+                          <span className="desktop-team-name">{match.homeTeam}</span>
+                        </div>
+                        <span className="desktop-vs">vs</span>
+                        <div className="desktop-team">
+                          <img 
+                            src={awayLogoUrl} 
+                            alt={match.awayTeam} 
+                            className="desktop-team-logo"
+                            onError={(e) => {
+                              if (match.awayTeamCrest) {
+                                e.target.src = getFlagUrl(match.awayTeam);
+                              }
+                            }}
+                          />
+                          <span className="desktop-team-name">{match.awayTeam}</span>
+                        </div>
+                        <span className="desktop-no-prediction">No prediction</span>
+                      </div>
                     </div>
                   </Link>
                 );
@@ -187,20 +230,6 @@ const Dashboard = () => {
             )}
           </div>
         )}
-
-        <div className="dashboard-actions">
-          <Link to="/matches" className="action-card">
-            <h3>View Matches</h3>
-            <p>See all upcoming matches and make predictions</p>
-            <span className="action-arrow">→</span>
-          </Link>
-
-          <Link to="/leaderboard" className="action-card">
-            <h3>Leaderboard</h3>
-            <p>See how you rank against other players</p>
-            <span className="action-arrow">→</span>
-          </Link>
-        </div>
       </div>
     </>
   );

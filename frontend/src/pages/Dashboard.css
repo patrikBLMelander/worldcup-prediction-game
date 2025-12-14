@@ -192,12 +192,7 @@
 }
 
 .upcoming-matches-section {
-  background: var(--surface);
-  border-radius: var(--radius-xl);
-  padding: var(--spacing-2xl);
   margin-bottom: var(--spacing-3xl);
-  box-shadow: var(--shadow-lg);
-  border: 1px solid var(--border);
 }
 
 .upcoming-matches-section h2 {
@@ -212,76 +207,82 @@
   margin-bottom: var(--spacing-xl);
   font-size: 1rem;
   line-height: 1.6;
+  font-style: italic;
 }
 
-.upcoming-matches-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
+/* Use matches-grid from Matches.css */
+.upcoming-matches-section .matches-grid {
   margin-bottom: var(--spacing-lg);
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
 }
 
-.upcoming-match-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--spacing-lg);
-  background: var(--surface-elevated);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border);
-  text-decoration: none;
-  color: var(--text-primary);
-  transition: all var(--transition-base);
+/* Make content more compact to fit smaller cards */
+.upcoming-matches-section .match-card {
+  padding: var(--spacing-md) var(--spacing-lg);
 }
 
-.upcoming-match-card:hover {
-  transform: translateX(4px);
-  border-color: var(--primary-500);
-  background: rgba(99, 102, 241, 0.1);
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-}
-
-.match-teams {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  flex: 1;
-}
-
-.team-info {
-  display: flex;
-  align-items: center;
+.upcoming-matches-section .desktop-compact-row {
   gap: var(--spacing-sm);
-}
-
-.team-logo-small {
-  width: 32px;
-  height: 32px;
-  object-fit: contain;
-  border-radius: var(--radius-sm);
-}
-
-.team-name-small {
-  font-weight: 600;
   font-size: 0.95rem;
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.vs-text {
-  color: var(--text-secondary);
-  font-weight: 500;
-  font-size: 0.875rem;
+.upcoming-matches-section .desktop-team {
+  max-width: 150px;
+  gap: var(--spacing-xs);
+}
+
+.upcoming-matches-section .desktop-team-logo {
+  width: 28px;
+  height: 28px;
+}
+
+.upcoming-matches-section .desktop-team-name {
+  font-size: 0.9rem;
+}
+
+.upcoming-matches-section .desktop-vs {
+  font-size: 0.85rem;
   margin: 0 var(--spacing-xs);
 }
 
-.match-date-small {
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-  font-weight: 500;
-  white-space: nowrap;
+.upcoming-matches-section .desktop-no-prediction {
+  font-size: 0.85rem;
+}
+
+.upcoming-matches-section .desktop-header-text {
+  font-size: 0.75rem;
+}
+
+.upcoming-matches-section .match-status,
+.upcoming-matches-section .match-group {
+  font-size: 0.75rem;
+  padding: 3px 8px;
+}
+
+.upcoming-matches-section .desktop-header-timer {
+  font-size: 0.8rem;
+}
+
+.upcoming-matches-section .desktop-header-timer .countdown-timer {
+  font-size: 0.8rem;
+  padding: 3px 6px;
+}
+
+/* Make match cards clickable links */
+.upcoming-matches-section .match-card {
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.upcoming-matches-section .match-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.4), 0 4px 8px -2px rgba(0, 0, 0, 0.3);
+}
+
+.upcoming-matches-section .match-card:visited {
+  color: inherit;
 }
 
 .view-all-link {
@@ -337,26 +338,4 @@
     padding: var(--spacing-xl);
   }
 
-  .upcoming-matches-section {
-    padding: var(--spacing-xl);
-  }
-
-  .upcoming-match-card {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--spacing-sm);
-  }
-
-  .match-teams {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .match-date-small {
-    align-self: flex-end;
-  }
-
-  .team-name-small {
-    max-width: 100px;
-  }
 }

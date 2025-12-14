@@ -39,12 +39,14 @@
 /* Tab Navigation */
 .matches-tabs {
   display: flex;
-  gap: 0;
+  gap: var(--spacing-sm);
   margin-bottom: var(--spacing-2xl);
-  border-bottom: 2px solid var(--border);
   padding-bottom: 0;
   width: 100%;
   overflow: hidden;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-xs);
 }
 
 .tab-button {
@@ -55,14 +57,12 @@
   padding: var(--spacing-md) var(--spacing-lg);
   background: transparent;
   border: none;
-  border-bottom: 3px solid transparent;
   color: var(--text-secondary);
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
   transition: all var(--transition-base);
   position: relative;
-  margin-bottom: -2px;
   font-family: var(--font-sans);
   flex: 1;
   width: 50%;
@@ -75,9 +75,9 @@
 }
 
 .tab-button.active {
-  color: var(--primary-500);
-  border-bottom-color: var(--primary-500);
+  color: var(--text-primary);
   background: var(--surface-elevated);
+  font-weight: 700;
 }
 
 .tab-icon {
