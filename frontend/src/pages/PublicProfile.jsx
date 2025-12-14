@@ -45,12 +45,17 @@ const PublicProfile = () => {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    // Parse date string as UTC (backend stores as UTC LocalDateTime)
+    const utcDate = dateString.endsWith('Z') 
+      ? new Date(dateString)
+      : new Date(dateString + 'Z'); // Append Z if not present to treat as UTC
+    return utcDate.toLocaleString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      timeZone: 'UTC'
     });
   };
 

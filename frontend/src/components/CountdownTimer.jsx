@@ -16,7 +16,11 @@ const CountdownTimer = ({ matchDate, status, matchId, onExpired }) => {
 
     const updateTimer = () => {
       const now = new Date();
-      const matchTime = new Date(matchDate);
+      // Parse match date as UTC (backend stores as UTC LocalDateTime)
+      const dateStr = matchDate;
+      const matchTime = dateStr.endsWith('Z') 
+        ? new Date(dateStr)
+        : new Date(dateStr + 'Z'); // Append Z if not present to treat as UTC
       const diff = matchTime - now;
 
       if (diff <= 0) {
@@ -67,10 +71,11 @@ const CountdownTimer = ({ matchDate, status, matchId, onExpired }) => {
   }
 
   if (timeLeft.expired) {
-    // Show locked message when countdown expires (before match actually starts)
+    // When countdown expires, show "Starting soon..." until status changes to LIVE
+    // Predictions remain editable until status is actually LIVE
     return (
-      <span className="countdown-timer locked">
-        🔒 Locked
+      <span className="countdown-timer urgent">
+        Starting soon...
       </span>
     );
   }

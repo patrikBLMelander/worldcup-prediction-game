@@ -433,7 +433,20 @@ const MatchRow = ({ match, onUpdateResult, onUpdateStatus, onDelete }) => {
       <td>
         {match.homeTeam} vs {match.awayTeam}
       </td>
-      <td>{new Date(match.matchDate).toLocaleString()}</td>
+      <td>{(() => {
+        const dateStr = match.matchDate;
+        const utcDate = dateStr.endsWith('Z') 
+          ? new Date(dateStr)
+          : new Date(dateStr + 'Z');
+        return utcDate.toLocaleString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'UTC'
+        });
+      })()}</td>
       <td>{match.venue}</td>
       <td>{match.group}</td>
       <td>

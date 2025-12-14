@@ -3,7 +3,6 @@ package com.worldcup.config;
 import com.worldcup.entity.Match;
 import com.worldcup.entity.MatchStatus;
 import com.worldcup.repository.MatchRepository;
-import com.worldcup.service.PredictionService;
 import com.worldcup.service.WebSocketService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -21,7 +21,6 @@ import java.util.List;
 public class MatchStatusScheduler {
 
     private final MatchRepository matchRepository;
-    private final PredictionService predictionService;
     private final WebSocketService webSocketService;
 
     @jakarta.annotation.PostConstruct
@@ -40,7 +39,6 @@ public class MatchStatusScheduler {
         try {
             // Use UTC for all time comparisons to match PostgreSQL's UTC storage
             LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
-            LocalDateTime twoHoursAgo = now.minusHours(2);
 
             log.info("=== SCHEDULER RUNNING - Current time (UTC): {} ===", now);
 
@@ -48,7 +46,10 @@ public class MatchStatusScheduler {
             List<Match> scheduledMatches = matchRepository.findByStatus(MatchStatus.SCHEDULED);
             log.info("Found {} scheduled matches to check", scheduledMatches.size());
             
-            for (Match match : scheduledMatches) {
+            // Create a copy to avoid concurrent modification issues
+            List<Match> scheduledMatchesCopy = new ArrayList<>(scheduledMatches);
+            
+            for (Match match : scheduledMatchesCopy) {
                 if (match.getMatchDate() != null) {
                     // Use isBefore with a small buffer (1 second) to account for any timing precision issues
                     // Also check if match time is equal or before now
@@ -77,13 +78,23 @@ public class MatchStatusScheduler {
             }
 
             // Update LIVE matches to FINISHED when match time + 2 hours is reached
+            // Note: In practice, matches should be manually marked as FINISHED by admin
+            // after setting the final scores. This scheduler is a fallback.
             List<Match> liveMatches = matchRepository.findByStatus(MatchStatus.LIVE);
             log.info("Found {} live matches to check", liveMatches.size());
             
-            for (Match match : liveMatches) {
-                if (match.getMatchDate() != null && !match.getMatchDate().isAfter(twoHoursAgo)) {
-                    log.info("Updating match {} from LIVE to FINISHED (match time: {}, twoHoursAgo: {})", 
-                        match.getId(), match.getMatchDate(), twoHoursAgo);
+            // Create a copy to avoid concurrent modification issues
+            List<Match> liveMatchesCopy = new ArrayList<>(liveMatches);
+            
+            for (Match match : liveMatchesCopy) {
+                // Mark as FINISHED if match time + 2.5 hours has passed (allowing for extra time)
+                LocalDateTime matchEndTime = match.getMatchDate() != null 
+                    ? match.getMatchDate().plusHours(2).plusMinutes(30)
+                    : null;
+                
+                if (matchEndTime != null && !matchEndTime.isAfter(now)) {
+                    log.info("Updating match {} from LIVE to FINISHED (match time: {}, match end time: {}, now: {})", 
+                        match.getId(), match.getMatchDate(), matchEndTime, now);
                     MatchStatus oldStatus = match.getStatus();
                     match.setStatus(MatchStatus.FINISHED);
                     matchRepository.save(match);
@@ -91,17 +102,8 @@ public class MatchStatusScheduler {
                     // Broadcast update via WebSocket
                     webSocketService.broadcastMatchStatusChange(match.getId(), oldStatus.name(), MatchStatus.FINISHED.name());
                     
-                    // If match has scores, calculate points
-                    if (match.getHomeScore() != null && match.getAwayScore() != null) {
-                        try {
-                            predictionService.calculatePointsForMatch(match.getId());
-                            log.info("Calculated points for match {}", match.getId());
-                            // Broadcast match update after points calculation
-                            webSocketService.broadcastMatchUpdate(match.getId());
-                        } catch (Exception e) {
-                            log.error("Failed to calculate points for match {}: {}", match.getId(), e.getMessage());
-                        }
-                    }
+                    // Note: Points calculation is automatically handled by MatchEntityListener
+                    // when match is saved with FINISHED status and has scores
                 }
             }
         } catch (Exception e) {

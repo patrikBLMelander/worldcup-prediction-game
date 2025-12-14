@@ -162,12 +162,19 @@ const Dashboard = () => {
                       </div>
                     </div>
                     <div className="match-date-small">
-                      {new Date(match.matchDate).toLocaleString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
+                      {(() => {
+                        const dateStr = match.matchDate;
+                        const utcDate = dateStr.endsWith('Z') 
+                          ? new Date(dateStr)
+                          : new Date(dateStr + 'Z');
+                        return utcDate.toLocaleString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          timeZone: 'UTC'
+                        });
+                      })()}
                     </div>
                   </Link>
                 );

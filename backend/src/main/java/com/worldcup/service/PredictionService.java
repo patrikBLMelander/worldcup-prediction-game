@@ -30,14 +30,10 @@ public class PredictionService {
             .orElseThrow(() -> new IllegalArgumentException("Match not found"));
 
         // Check if match is still open for predictions
+        // Predictions are allowed only when match status is SCHEDULED
+        // Once status changes to LIVE or FINISHED, predictions are locked
         if (match.getStatus() != com.worldcup.entity.MatchStatus.SCHEDULED) {
-            throw new IllegalStateException("Cannot make predictions for matches that are not scheduled");
-        }
-
-        // Check if match time has passed (even if status is still SCHEDULED)
-        if (match.getMatchDate() != null && 
-            !match.getMatchDate().isAfter(java.time.LocalDateTime.now())) {
-            throw new IllegalStateException("Cannot make predictions for matches that have already started");
+            throw new IllegalStateException("Cannot make predictions for matches that are not scheduled. Match status: " + match.getStatus());
         }
 
         Optional<Prediction> existingPrediction = predictionRepository.findByUserAndMatch(user, match);

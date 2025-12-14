@@ -115,13 +115,9 @@ public class AdminController {
             @RequestParam MatchStatus status) {
         Match match = matchService.updateMatchStatus(id, status);
         
-        if (status == MatchStatus.FINISHED && match.getHomeScore() != null && match.getAwayScore() != null) {
-            try {
-                predictionService.calculatePointsForMatch(id);
-            } catch (IllegalStateException e) {
-                // Points calculation failed - that's okay
-            }
-        }
+        // Note: Points calculation is automatically handled by MatchEntityListener
+        // when match status is updated to FINISHED and has scores.
+        // No need to calculate manually here to avoid concurrent modification issues.
         
         // Broadcast match status change via WebSocket
         webSocketService.broadcastMatchUpdate(id);

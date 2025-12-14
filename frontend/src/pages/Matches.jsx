@@ -139,7 +139,11 @@ const Matches = () => {
     const now = new Date();
     const matchesNeedingPolling = matches.filter(match => {
       if (match.status !== 'SCHEDULED') return false;
-      const matchDate = new Date(match.matchDate);
+      // Parse match date as UTC
+      const dateStr = match.matchDate;
+      const matchDate = dateStr.endsWith('Z') 
+        ? new Date(dateStr)
+        : new Date(dateStr + 'Z');
       const timeDiff = matchDate - now;
       // Poll aggressively for matches starting within the next 5 minutes or that have just passed
       return timeDiff <= 5 * 60 * 1000 && timeDiff >= -10 * 60 * 1000;
@@ -448,8 +452,8 @@ const Matches = () => {
                       {(match.status === 'FINISHED' || match.status === 'LIVE') && match.homeScore !== null && (
                         <div className="team-score">{match.homeScore}</div>
                       )}
-                      {/* Show prediction input only if match is scheduled and not yet locked */}
-                      {match.status === 'SCHEDULED' && new Date(match.matchDate) > new Date() && (
+                      {/* Show prediction input only if match is scheduled (not LIVE or FINISHED) */}
+                      {match.status === 'SCHEDULED' && (
                         <div className="prediction-input-wrapper">
                           <input
                             type="number"
@@ -480,8 +484,8 @@ const Matches = () => {
                       {(match.status === 'FINISHED' || match.status === 'LIVE') && match.awayScore !== null && (
                         <div className="team-score">{match.awayScore}</div>
                       )}
-                      {/* Show prediction input only if match is scheduled and not yet locked */}
-                      {match.status === 'SCHEDULED' && new Date(match.matchDate) > new Date() && (
+                      {/* Show prediction input only if match is scheduled (not LIVE or FINISHED) */}
+                      {match.status === 'SCHEDULED' && (
                         <div className="prediction-input-wrapper">
                           <input
                             type="number"
@@ -499,19 +503,27 @@ const Matches = () => {
 
                   <div className="match-info">
                     <div className="match-date">
-                      {new Date(match.matchDate).toLocaleString('en-US', {
-                        weekday: 'short',
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
+                      {(() => {
+                        // Parse date string as UTC (backend stores as UTC LocalDateTime)
+                        const dateStr = match.matchDate;
+                        const utcDate = dateStr.endsWith('Z') 
+                          ? new Date(dateStr)
+                          : new Date(dateStr + 'Z'); // Append Z if not present to treat as UTC
+                        return utcDate.toLocaleString('en-US', {
+                          weekday: 'short',
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          timeZone: 'UTC'
+                        });
+                      })()}
                     </div>
                   </div>
 
-                  {/* Show prediction between date and live score */}
-                  {((match.status === 'SCHEDULED' && new Date(match.matchDate) <= new Date()) || match.status === 'LIVE' || match.status === 'FINISHED') && (
+                  {/* Show prediction summary for LIVE or FINISHED matches */}
+                  {(match.status === 'LIVE' || match.status === 'FINISHED') && (
                     <div className="prediction-summary">
                       <span className="prediction-summary-label">Your Prediction:</span>
                       <span className="prediction-summary-score">
@@ -534,8 +546,8 @@ const Matches = () => {
                     </div>
                   )}
 
-                  {/* Prediction status for scheduled matches (only when not locked) */}
-                  {match.status === 'SCHEDULED' && new Date(match.matchDate) > new Date() && (
+                  {/* Prediction status for scheduled matches */}
+                  {match.status === 'SCHEDULED' && (
                     <div className="match-actions">
                       {savingStates[match.id] === 'saving' && (
                         <span className="prediction-status saving">💾 Saving...</span>
@@ -552,14 +564,14 @@ const Matches = () => {
                     </div>
                   )}
                   
-                  {/* Locked message for locked or live matches */}
-                  {(match.status === 'SCHEDULED' && new Date(match.matchDate) <= new Date()) || match.status === 'LIVE' ? (
+                  {/* Locked message for live or finished matches */}
+                  {(match.status === 'LIVE' || match.status === 'FINISHED') && (
                     <div className="match-actions">
                       <span className="prediction-status locked">
-                        {match.status === 'LIVE' ? '🔒 Predictions locked - Match is LIVE' : '🔒 Predictions locked'}
+                        {match.status === 'LIVE' ? '🔒 Predictions locked - Match is LIVE' : '🔒 Predictions locked - Match is FINISHED'}
                       </span>
                     </div>
-                  ) : null}
+                  )}
 
                   {/* Results summary for finished matches */}
                   {match.status === 'FINISHED' && (
