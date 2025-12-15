@@ -85,6 +85,11 @@ public class PredictionService {
             throw new IllegalStateException("Match result not available");
         }
 
+        // Only calculate points for FINISHED matches
+        if (match.getStatus() != MatchStatus.FINISHED) {
+            throw new IllegalStateException("Points can only be calculated for FINISHED matches. Current status: " + match.getStatus());
+        }
+
         List<Prediction> predictions = predictionRepository.findByMatch(match);
 
         for (Prediction prediction : predictions) {
@@ -177,19 +182,27 @@ public class PredictionService {
             })
             .map(p -> {
                 try {
-                    // Calculate points if not already calculated
-                    if (p.getPoints() == null) {
-                        Match match = p.getMatch();
-                        if (match != null && match.getHomeScore() != null && match.getAwayScore() != null &&
-                            p.getPredictedHomeScore() != null && p.getPredictedAwayScore() != null) {
-                            int points = calculatePoints(
-                                p.getPredictedHomeScore(),
-                                p.getPredictedAwayScore(),
-                                match.getHomeScore(),
-                                match.getAwayScore()
-                            );
+                    Match match = p.getMatch();
+                    MatchStatus status = match != null ? match.getStatus() : null;
+                    
+                    // Only calculate and save points for FINISHED matches
+                    // For LIVE matches, calculate on-the-fly for display only (don't save)
+                    if (p.getPoints() == null && match != null && match.getHomeScore() != null && match.getAwayScore() != null &&
+                        p.getPredictedHomeScore() != null && p.getPredictedAwayScore() != null) {
+                        int points = calculatePoints(
+                            p.getPredictedHomeScore(),
+                            p.getPredictedAwayScore(),
+                            match.getHomeScore(),
+                            match.getAwayScore()
+                        );
+                        
+                        // Only save points for FINISHED matches
+                        if (status == MatchStatus.FINISHED) {
                             p.setPoints(points);
                             predictionRepository.save(p);
+                        } else {
+                            // For LIVE matches, set points temporarily for display (won't be saved)
+                            p.setPoints(points);
                         }
                     }
                     return p;
@@ -271,19 +284,27 @@ public class PredictionService {
             })
             .map(p -> {
                 try {
-                    // Calculate points if not already calculated
-                    if (p.getPoints() == null) {
-                        Match match = p.getMatch();
-                        if (match != null && match.getHomeScore() != null && match.getAwayScore() != null &&
-                            p.getPredictedHomeScore() != null && p.getPredictedAwayScore() != null) {
-                            int points = calculatePoints(
-                                p.getPredictedHomeScore(),
-                                p.getPredictedAwayScore(),
-                                match.getHomeScore(),
-                                match.getAwayScore()
-                            );
+                    Match match = p.getMatch();
+                    MatchStatus status = match != null ? match.getStatus() : null;
+                    
+                    // Only calculate and save points for FINISHED matches
+                    // For LIVE matches, calculate on-the-fly for display only (don't save)
+                    if (p.getPoints() == null && match != null && match.getHomeScore() != null && match.getAwayScore() != null &&
+                        p.getPredictedHomeScore() != null && p.getPredictedAwayScore() != null) {
+                        int points = calculatePoints(
+                            p.getPredictedHomeScore(),
+                            p.getPredictedAwayScore(),
+                            match.getHomeScore(),
+                            match.getAwayScore()
+                        );
+                        
+                        // Only save points for FINISHED matches
+                        if (status == MatchStatus.FINISHED) {
                             p.setPoints(points);
                             predictionRepository.save(p);
+                        } else {
+                            // For LIVE matches, set points temporarily for display (won't be saved)
+                            p.setPoints(points);
                         }
                     }
                     return p;

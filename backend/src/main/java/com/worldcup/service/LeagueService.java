@@ -143,7 +143,7 @@ public class LeagueService {
             if (status != MatchStatus.FINISHED && status != MatchStatus.LIVE) continue;
             if (match.getHomeScore() == null || match.getAwayScore() == null) continue;
 
-            // Ensure points exist
+            // Ensure points exist - only calculate and save for FINISHED matches
             Integer points = p.getPoints();
             if (points == null &&
                 p.getPredictedHomeScore() != null &&
@@ -154,8 +154,13 @@ public class LeagueService {
                         match.getHomeScore(),
                         match.getAwayScore()
                 );
-                p.setPoints(points);
-                predictionRepository.save(p);
+                
+                // Only save points for FINISHED matches
+                if (status == MatchStatus.FINISHED) {
+                    p.setPoints(points);
+                    predictionRepository.save(p);
+                }
+                // For LIVE matches, use points for display only (don't save)
             }
 
             if (points != null) {

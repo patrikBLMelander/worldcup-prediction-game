@@ -57,18 +57,20 @@ const PublicProfile = () => {
 
   if (loading) {
     return (
-      <>
+      <div className="profile-container">
         <Navigation />
-        <div className="public-profile-loading">Loading profile...</div>
-      </>
+        <div className="profile-content">
+          <div className="public-profile-loading">Loading profile...</div>
+        </div>
+      </div>
     );
   }
 
   if (error || !profile) {
     return (
-      <>
+      <div className="profile-container">
         <Navigation />
-        <div className="public-profile-container">
+        <div className="profile-content">
           <div className="public-profile-error">
             <p>{error || 'Profile not found'}</p>
             <button onClick={() => navigate('/leaderboard')} className="btn-primary">
@@ -76,14 +78,14 @@ const PublicProfile = () => {
             </button>
           </div>
         </div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="profile-container">
       <Navigation />
-      <div className="public-profile-container">
+      <div className="profile-content">
         <div className="public-profile-header">
           <button onClick={() => navigate('/leaderboard')} className="back-button">
             ← Back to Leaderboard
@@ -180,11 +182,15 @@ const PublicProfile = () => {
                 const awayLogoUrl = prediction.awayTeamCrest || getFlagUrl(prediction.awayTeam);
                 const pointsColor = getPointsColor(prediction.points);
                 
+                const isLive = prediction.matchStatus === 'LIVE';
+                const isFinished = prediction.matchStatus === 'FINISHED';
+                
                 return (
                   <div key={prediction.matchId} className="prediction-card match-card results-view">
                     <div className="match-header">
                       <div className="match-header-left">
-                        <span className="match-status status-finished">FINISHED</span>
+                        {isLive && <span className="match-status status-live">LIVE</span>}
+                        {isFinished && <span className="match-status status-finished">FINISHED</span>}
                         <span className="match-group">{prediction.group || 'Match'}</span>
                         {prediction.points !== null && prediction.points !== undefined ? (
                           <div className="header-points">
@@ -251,7 +257,7 @@ const PublicProfile = () => {
           )}
         </section>
       </div>
-    </>
+    </div>
   );
 };
 

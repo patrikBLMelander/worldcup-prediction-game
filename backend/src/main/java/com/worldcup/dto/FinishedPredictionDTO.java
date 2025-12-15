@@ -24,5 +24,6 @@ public class FinishedPredictionDTO {
     private Integer actualAwayScore;
     private Integer points;
     private String resultType; // "EXACT", "CORRECT_WINNER", "WRONG"
+    private String matchStatus; // "SCHEDULED", "LIVE", "FINISHED", "CANCELLED"
 }
 

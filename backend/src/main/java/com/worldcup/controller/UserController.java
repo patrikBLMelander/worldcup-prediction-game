@@ -227,9 +227,11 @@ public class UserController {
                 .map(p -> {
                     Match match = p.getMatch();
                     Integer points = p.getPoints();
+                    MatchStatus status = match.getStatus();
                     
-                    // Calculate points if not already calculated
-                    if (points == null && match.getHomeScore() != null && match.getAwayScore() != null) {
+                    // Only calculate and save points for FINISHED matches
+                    // For LIVE matches, only display points if already calculated (don't calculate new ones as scores can change)
+                    if (points == null && status == MatchStatus.FINISHED && match.getHomeScore() != null && match.getAwayScore() != null) {
                         points = predictionService.calculatePointsForPrediction(
                             p.getPredictedHomeScore(),
                             p.getPredictedAwayScore(),
@@ -239,6 +241,17 @@ public class UserController {
                         // Save the calculated points
                         p.setPoints(points);
                         predictionRepository.save(p);
+                    }
+                    
+                    // For LIVE matches, calculate points on-the-fly for display only (don't save)
+                    if (points == null && status == MatchStatus.LIVE && match.getHomeScore() != null && match.getAwayScore() != null) {
+                        points = predictionService.calculatePointsForPrediction(
+                            p.getPredictedHomeScore(),
+                            p.getPredictedAwayScore(),
+                            match.getHomeScore(),
+                            match.getAwayScore()
+                        );
+                        // Don't save - match is still LIVE, scores can change
                     }
                     
                     String resultType;
@@ -264,7 +277,8 @@ public class UserController {
                             match.getHomeScore(),
                             match.getAwayScore(),
                             points,
-                            resultType
+                            resultType,
+                            match.getStatus().name()
                     );
                 })
                 .collect(Collectors.toList());

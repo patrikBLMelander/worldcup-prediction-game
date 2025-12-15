@@ -1,7 +1,7 @@
 .public-profile-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: var(--spacing-3xl) var(--spacing-xl);
+  padding: var(--spacing-sm) 0 var(--spacing-xl) 0;
 }
 
 .public-profile-loading,
@@ -234,6 +234,13 @@
 .prediction-card .match-status.status-finished {
   background: #22c55e;
   color: white;
+}
+
+.prediction-card .match-status.status-live {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  animation: pulse 2s infinite;
 }
 
 .prediction-card .match-group {
@@ -516,7 +523,7 @@
 
 @media (max-width: 768px) {
   .public-profile-container {
-    padding: var(--spacing-lg) var(--spacing-sm);
+    padding: var(--spacing-sm) 0 var(--spacing-lg) 0;
   }
 
   .public-profile-header h1 {
@@ -624,6 +631,17 @@
   .prediction-card .prediction-result {
     font-size: 0.9rem;
     padding: 2px 6px;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.02);
   }
 }
 
