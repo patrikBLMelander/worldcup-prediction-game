@@ -124,6 +124,39 @@
   border: 1px solid var(--border);
 }
 
+/* Mobile: fully hide filters when collapsed */
+@media (max-width: 768px) {
+  .matches-filters {
+    display: none;
+    max-height: 0;
+    overflow: hidden;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+  }
+
+  .matches-filters.expanded {
+    display: flex;
+    max-height: 800px;
+    padding: var(--spacing-lg);
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  }
+
+  .filters-toggle {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--surface);
+    border: 1px solid var(--primary-400);
+    border-radius: var(--radius-full);
+    color: var(--text-primary);
+    font-weight: 700;
+  }
+}
+
 .filter-group {
   display: flex;
   align-items: center;
@@ -218,7 +251,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(to right, rgba(34, 197, 94, 0.08) 0%, rgba(34, 197, 94, 0.02) 30%, transparent 100%);
+  background: linear-gradient(to right, rgba(34, 197, 94, 0.12) 0%, rgba(34, 197, 94, 0.05) 35%, transparent 100%);
   pointer-events: none;
   border-radius: var(--radius-xl);
   z-index: 0;
@@ -235,7 +268,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(to right, rgba(239, 68, 68, 0.08) 0%, rgba(239, 68, 68, 0.02) 30%, transparent 100%);
+  background: linear-gradient(to right, rgba(239, 68, 68, 0.12) 0%, rgba(239, 68, 68, 0.05) 35%, transparent 100%);
   pointer-events: none;
   border-radius: var(--radius-xl);
   z-index: 0;
@@ -252,7 +285,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(to right, rgba(245, 158, 11, 0.08) 0%, rgba(245, 158, 11, 0.02) 30%, transparent 100%);
+  background: linear-gradient(to right, rgba(245, 158, 11, 0.12) 0%, rgba(245, 158, 11, 0.05) 35%, transparent 100%);
   pointer-events: none;
   border-radius: var(--radius-xl);
   z-index: 0;
@@ -269,7 +302,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(to right, rgba(234, 179, 8, 0.08) 0%, rgba(234, 179, 8, 0.02) 30%, transparent 100%);
+  background: linear-gradient(to right, rgba(234, 179, 8, 0.12) 0%, rgba(234, 179, 8, 0.05) 35%, transparent 100%);
   pointer-events: none;
   border-radius: var(--radius-xl);
   z-index: 0;
