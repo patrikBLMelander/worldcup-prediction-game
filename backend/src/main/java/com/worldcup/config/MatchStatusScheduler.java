@@ -33,11 +33,11 @@ public class MatchStatusScheduler {
     }
 
     /**
-     * Runs every 10 seconds to check and update match statuses
+     * Runs every 30 seconds to check and update match statuses
      * - SCHEDULED -> LIVE: When match date/time is reached or passed
      * - LIVE -> FINISHED: When match date/time + 2 hours is reached (assuming matches last ~2 hours)
      */
-    @Scheduled(fixedRate = 10000) // Run every 10 seconds for more responsive status updates
+    @Scheduled(fixedRate = 30000) // Run every 30 seconds to reduce memory pressure
     public void updateMatchStatuses() {
         try {
             // Use UTC for all time comparisons to match PostgreSQL's UTC storage

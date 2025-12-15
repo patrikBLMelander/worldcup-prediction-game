@@ -67,8 +67,8 @@ public class FootballApiSyncScheduler {
             List<FootballApiService.MatchData> apiMatches = footballApiService.fetchMatches(now, endDate);
 
             // Group existing matches by external API ID
-            Map<String, Match> existingMatches = matchRepository.findAll().stream()
-                    .filter(m -> m.getExternalApiId() != null && !m.getExternalApiId().isEmpty())
+            // Only fetch matches with external API IDs to avoid loading all matches into memory
+            Map<String, Match> existingMatches = matchRepository.findAllWithExternalApiId().stream()
                     .collect(Collectors.toMap(Match::getExternalApiId, m -> m));
 
             int created = 0;
@@ -102,10 +102,10 @@ public class FootballApiSyncScheduler {
     }
 
     /**
-     * Sync live scores - runs every 30 seconds during match days
+     * Sync live scores - runs every 60 seconds during match days
      * Fetches matches that are currently live
      */
-    @Scheduled(fixedRate = 30000) // Every 30 seconds
+    @Scheduled(fixedRate = 60000) // Every 60 seconds to reduce memory pressure
     @Transactional
     public void syncLiveScores() {
         if (!apiEnabled) {
@@ -122,8 +122,8 @@ public class FootballApiSyncScheduler {
             log.info("Syncing {} live matches from Football API...", liveMatches.size());
 
             // Group existing matches by external API ID
-            Map<String, Match> existingMatches = matchRepository.findAll().stream()
-                    .filter(m -> m.getExternalApiId() != null && !m.getExternalApiId().isEmpty())
+            // Only fetch matches with external API IDs to avoid loading all matches into memory
+            Map<String, Match> existingMatches = matchRepository.findAllWithExternalApiId().stream()
                     .collect(Collectors.toMap(Match::getExternalApiId, m -> m));
 
             for (FootballApiService.MatchData apiMatch : liveMatches) {
@@ -187,8 +187,8 @@ public class FootballApiSyncScheduler {
             log.info("Syncing {} finished matches from Football API...", finishedMatches.size());
 
             // Group existing matches by external API ID
-            Map<String, Match> existingMatches = matchRepository.findAll().stream()
-                    .filter(m -> m.getExternalApiId() != null && !m.getExternalApiId().isEmpty())
+            // Only fetch matches with external API IDs to avoid loading all matches into memory
+            Map<String, Match> existingMatches = matchRepository.findAllWithExternalApiId().stream()
                     .collect(Collectors.toMap(Match::getExternalApiId, m -> m));
 
             for (FootballApiService.MatchData apiMatch : finishedMatches) {
