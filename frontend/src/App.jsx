@@ -7,6 +7,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Matches from './pages/Matches';
 import Leaderboard from './pages/Leaderboard';
+import Leagues from './pages/Leagues';
 import Profile from './pages/Profile';
 import PublicProfile from './pages/PublicProfile';
 import Admin from './pages/Admin';
@@ -67,6 +68,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Leaderboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/leagues"
+          element={
+            <ProtectedRoute>
+              <Leagues />
             </ProtectedRoute>
           }
         />

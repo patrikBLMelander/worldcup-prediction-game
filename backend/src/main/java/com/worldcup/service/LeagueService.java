@@ -2,6 +2,7 @@ package com.worldcup.service;
 
 import com.worldcup.dto.CreateLeagueRequest;
 import com.worldcup.dto.LeagueSummaryDTO;
+import com.worldcup.dto.LeagueMemberDTO;
 import com.worldcup.dto.LeaderboardEntryDTO;
 import com.worldcup.entity.League;
 import com.worldcup.entity.LeagueMembership;
@@ -176,6 +177,37 @@ public class LeagueService {
                 totalPoints,
                 predictionCount
         );
+    }
+
+    @Transactional(readOnly = true)
+    public List<LeagueMemberDTO> getLeagueMembers(Long leagueId) {
+        League league = leagueRepository.findById(leagueId)
+                .orElseThrow(() -> new IllegalArgumentException("League not found"));
+
+        List<LeagueMembership> memberships = membershipRepository.findByLeague(league);
+        
+        return memberships.stream()
+                .map(membership -> {
+                    User user = membership.getUser();
+                    return new LeagueMemberDTO(
+                            user.getId(),
+                            user.getEmail(),
+                            user.getScreenName(),
+                            membership.getRole().name(),
+                            membership.getJoinedAt()
+                    );
+                })
+                .sorted((a, b) -> {
+                    // Sort: OWNER first, then by joined date
+                    if (a.getRole().equals("OWNER") && !b.getRole().equals("OWNER")) {
+                        return -1;
+                    }
+                    if (!a.getRole().equals("OWNER") && b.getRole().equals("OWNER")) {
+                        return 1;
+                    }
+                    return a.getJoinedAt().compareTo(b.getJoinedAt());
+                })
+                .collect(Collectors.toList());
     }
 
     private LeagueSummaryDTO toSummary(League league) {

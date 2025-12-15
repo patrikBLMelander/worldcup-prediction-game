@@ -15,7 +15,7 @@
 
 .leaderboard-header {
   text-align: center;
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
   margin-top: 0;
 }
 
@@ -34,7 +34,70 @@
   color: var(--text-secondary);
   font-size: 1.125rem;
   font-weight: 500;
+  margin-bottom: var(--spacing-xs);
+}
+
+.league-tabs-container {
   margin-bottom: var(--spacing-lg);
+  margin-top: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.league-tabs-container::-webkit-scrollbar {
+  display: none;
+}
+
+.league-tabs {
+  display: flex;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs);
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  min-width: fit-content;
+}
+
+.league-tab {
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-family: var(--font-sans);
+  flex-shrink: 0;
+}
+
+.league-tab:hover {
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+}
+
+.league-tab.active {
+  background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%);
+  color: white;
+  box-shadow: var(--shadow-md);
+  font-weight: 700;
+}
+
+.league-tab.active:hover {
+  background: linear-gradient(135deg, var(--primary-700) 0%, var(--primary-800) 100%);
+}
+
+.league-tab-icon {
+  font-size: 1rem;
+  flex-shrink: 0;
 }
 
 .user-position-badge {
@@ -335,6 +398,25 @@
     font-size: 1rem;
   }
 
+  .league-tabs-container {
+    margin-bottom: var(--spacing-lg);
+  }
+
+  .league-tabs {
+    padding: var(--spacing-xs);
+    gap: var(--spacing-xs);
+  }
+
+  .league-tab {
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-size: 0.9rem;
+    min-height: 44px;
+  }
+
+  .league-tab-icon {
+    font-size: 0.9rem;
+  }
+
   .user-position-badge {
     padding: var(--spacing-sm) var(--spacing-lg);
     font-size: 0.9rem;
@@ -474,5 +556,20 @@
 
   .stat-value {
     font-size: 1.75rem;
+  }
+
+  .league-tabs {
+    padding: var(--spacing-xs);
+    gap: var(--spacing-xs);
+  }
+
+  .league-tab {
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 0.85rem;
+    min-height: 40px;
+  }
+
+  .league-tab-icon {
+    font-size: 0.85rem;
   }
 }

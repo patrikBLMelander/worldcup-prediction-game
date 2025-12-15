@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { FiHome, FiCalendar, FiBarChart2, FiUser, FiSettings } from 'react-icons/fi';
+import { FiHome, FiCalendar, FiBarChart2, FiUser, FiSettings, FiUsers } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import './Navigation.css';
 
@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { path: '/dashboard', label: 'Dashboard', icon: FiHome },        // Home
   { path: '/matches', label: 'Matches', icon: FiCalendar },        // Matches schedule
   { path: '/leaderboard', label: 'Leaderboard', icon: FiBarChart2 }, // Ranking / stats
+  { path: '/leagues', label: 'Leagues', icon: FiUsers },          // Leagues
   { path: '/profile', label: 'Profile', icon: FiUser },            // User profile
   { path: '/admin', label: 'Admin', icon: FiSettings, adminOnly: true } // Admin/settings
 ];

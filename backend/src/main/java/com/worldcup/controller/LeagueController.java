@@ -3,6 +3,7 @@ package com.worldcup.controller;
 import com.worldcup.dto.CreateLeagueRequest;
 import com.worldcup.dto.JoinLeagueRequest;
 import com.worldcup.dto.LeagueSummaryDTO;
+import com.worldcup.dto.LeagueMemberDTO;
 import com.worldcup.dto.LeaderboardEntryDTO;
 import com.worldcup.entity.User;
 import com.worldcup.security.CurrentUser;
@@ -49,6 +50,12 @@ public class LeagueController {
         // Access control by membership can be added later if desired.
         List<LeaderboardEntryDTO> leaderboard = leagueService.getLeagueLeaderboard(leagueId);
         return ResponseEntity.ok(leaderboard);
+    }
+
+    @GetMapping("/{leagueId}/members")
+    public ResponseEntity<List<LeagueMemberDTO>> getLeagueMembers(@PathVariable Long leagueId) {
+        List<LeagueMemberDTO> members = leagueService.getLeagueMembers(leagueId);
+        return ResponseEntity.ok(members);
     }
 }
 
