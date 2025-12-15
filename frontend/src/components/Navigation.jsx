@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { FiHome, FiCalendar, FiBarChart2, FiUser, FiSettings } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
 import './Navigation.css';
 
 const NAV_ITEMS = [
-  { path: '/dashboard', label: 'Dashboard' },
-  { path: '/matches', label: 'Matches' },
-  { path: '/leaderboard', label: 'Leaderboard' },
-  { path: '/profile', label: 'Profile' },
-  { path: '/admin', label: 'Admin', adminOnly: true }
+  { path: '/dashboard', label: 'Dashboard', icon: FiHome },        // Home
+  { path: '/matches', label: 'Matches', icon: FiCalendar },        // Matches schedule
+  { path: '/leaderboard', label: 'Leaderboard', icon: FiBarChart2 }, // Ranking / stats
+  { path: '/profile', label: 'Profile', icon: FiUser },            // User profile
+  { path: '/admin', label: 'Admin', icon: FiSettings, adminOnly: true } // Admin/settings
 ];
 
 const Navigation = () => {
@@ -112,7 +113,19 @@ const Navigation = () => {
           className={`${linkClass} ${activeClass}`}
           onClick={isMobile ? closeMenu : undefined}
         >
-          {item.label}
+          {item.icon && (
+            <span
+              aria-hidden="true"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                marginRight: '0.4rem',
+              }}
+            >
+              <item.icon size={18} />
+            </span>
+          )}
+          <span>{item.label}</span>
         </Link>
       );
     });

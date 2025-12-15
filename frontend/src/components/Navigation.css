@@ -144,7 +144,7 @@
   background: var(--surface);
   border-left: 1px solid var(--border);
   z-index: 1000;
-  transition: right 0.3s ease;
+  transition: right 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), opacity 0.3s ease;
   box-shadow: -4px 0 20px rgba(0, 0, 0, 0.4);
   overflow-y: auto;
   opacity: 0;
@@ -157,18 +157,6 @@
   opacity: 1;
   pointer-events: all;
   visibility: visible;
-}
-
-/* Ensure mobile menu doesn't affect layout when closed on mobile */
-@media (max-width: 768px) {
-  .mobile-menu:not(.open) {
-    display: none;
-    width: 0;
-    height: 0;
-    position: absolute;
-    visibility: hidden;
-    pointer-events: none;
-  }
 }
 
 .menu-overlay {

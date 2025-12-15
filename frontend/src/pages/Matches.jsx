@@ -355,17 +355,18 @@ const Matches = () => {
 
   if (loading) {
     return (
-      <>
+      <div className="profile-container">
         <Navigation />
         <div className="matches-loading">Loading matches...</div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="profile-container">
       <Navigation />
-      <div className="matches-container">
+      <div className="profile-content">
+        <div className="matches-container">
         <div className="matches-header">
           <h1>World Cup 2026 Matches</h1>
           <p>View all matches and make your predictions</p>
@@ -735,7 +736,8 @@ const Matches = () => {
           </div>
         )}
       </div>
-    </>
+      </div>
+    </div>
   );
 };
 

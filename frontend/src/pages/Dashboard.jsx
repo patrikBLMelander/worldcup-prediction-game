@@ -82,17 +82,18 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <>
+      <div className="profile-container">
         <Navigation />
         <div className="dashboard-loading">Loading...</div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="profile-container">
       <Navigation />
-      <div className="dashboard-container">
+      <div className="profile-content">
+        <div className="dashboard-container">
         <div className="dashboard-header">
           <h1>Welcome back, {user?.screenName || user?.email}!</h1>
           <p className="dashboard-subtitle">World Cup 2026 Prediction Game</p>
@@ -231,7 +232,8 @@ const Dashboard = () => {
           </div>
         )}
       </div>
-    </>
+      </div>
+    </div>
   );
 };
 

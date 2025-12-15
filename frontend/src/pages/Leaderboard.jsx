@@ -60,17 +60,18 @@ const Leaderboard = () => {
 
   if (loading) {
     return (
-      <>
+      <div className="profile-container">
         <Navigation />
         <div className="leaderboard-loading">Loading leaderboard...</div>
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="profile-container">
       <Navigation />
-      <div className="leaderboard-container">
+      <div className="profile-content">
+        <div className="leaderboard-container">
         <div className="leaderboard-header">
           <h1>🏆 Leaderboard</h1>
           <p>See how you rank against other players</p>
@@ -158,7 +159,8 @@ const Leaderboard = () => {
           </div>
         )}
       </div>
-    </>
+      </div>
+    </div>
   );
 };
 

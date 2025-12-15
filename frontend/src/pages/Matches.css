@@ -1,7 +1,7 @@
 .matches-container {
   max-width: 1400px;
   margin: 0 auto;
-  padding: var(--spacing-sm) var(--spacing-xl) var(--spacing-xl) var(--spacing-xl);
+  padding: var(--spacing-sm) 0 var(--spacing-xl) 0;
 }
 
 /* Force no top spacing on mobile */
@@ -405,6 +405,8 @@
 
 .desktop-match-compact {
   margin: var(--spacing-md) 0;
+  display: flex;
+  justify-content: center;
 }
 
 .desktop-compact-row {
@@ -414,7 +416,9 @@
   gap: var(--spacing-md);
   flex-wrap: nowrap;
   font-size: 1rem;
+  max-width: 520px;
   width: 100%;
+  margin: 0 auto;
 }
 
 /* Special layout for finished matches on desktop */
