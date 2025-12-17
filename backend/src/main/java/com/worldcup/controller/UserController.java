@@ -30,7 +30,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -308,57 +307,14 @@ public class UserController {
     public ResponseEntity<List<AchievementDTO>> getMyAchievements() {
         User user = currentUser.getCurrentUserOrThrow();
         
-        // Get all available achievements, ordered by category and rarity (ascending for "next" logic)
-        List<Achievement> allAchievements = achievementRepository.findByActiveTrueOrderByCategoryAscRarityDesc();
-        
         // Get user's earned achievements
         List<UserAchievement> userAchievements = userAchievementRepository.findByUserOrderByEarnedAtDesc(user);
-        Set<String> earnedCodes = userAchievements.stream()
-            .map(ua -> ua.getAchievement().getCode())
-            .collect(Collectors.toSet());
         
-        // Create a map of earned achievements by code for quick lookup
-        Map<String, UserAchievement> earnedMap = userAchievements.stream()
-            .collect(Collectors.toMap(
-                ua -> ua.getAchievement().getCode(),
-                ua -> ua
-            ));
-        
-        // Group achievements by category
-        Map<String, List<Achievement>> achievementsByCategory = allAchievements.stream()
-            .collect(Collectors.groupingBy(Achievement::getCategory));
-        
-        // For each category, show earned achievements sequentially + the next unearned one
-        List<AchievementDTO> achievementDTOs = new ArrayList<>();
-        
-        for (Map.Entry<String, List<Achievement>> categoryEntry : achievementsByCategory.entrySet()) {
-            List<Achievement> categoryAchievements = categoryEntry.getValue();
-            
-            // Sort achievements by ID (creation order) to maintain progression sequence
-            categoryAchievements.sort((a1, a2) -> Long.compare(a1.getId(), a2.getId()));
-            
-            // Find the highest earned achievement index in the progression
-            // We need to find the highest consecutive earned achievement from the start
-            int highestConsecutiveEarnedIndex = -1;
-            for (int i = 0; i < categoryAchievements.size(); i++) {
-                if (earnedCodes.contains(categoryAchievements.get(i).getCode())) {
-                    highestConsecutiveEarnedIndex = i;
-                } else {
-                    // Stop at first unearned achievement (must be consecutive from start)
-                    break;
-                }
-            }
-            
-            // Add all earned achievements (consecutive from start)
-            for (int i = 0; i <= highestConsecutiveEarnedIndex; i++) {
-                Achievement achievement = categoryAchievements.get(i);
-                UserAchievement ua = earnedMap.get(achievement.getCode());
-                if (ua == null) {
-                    log.warn("User achievement not found in map for achievement {} and user {}", 
-                            achievement.getCode(), user.getId());
-                    continue; // Skip if data inconsistency
-                }
-                achievementDTOs.add(new AchievementDTO(
+        // Convert to DTOs - only show earned achievements
+        List<AchievementDTO> achievementDTOs = userAchievements.stream()
+            .map(ua -> {
+                Achievement achievement = ua.getAchievement();
+                return new AchievementDTO(
                     achievement.getId(),
                     achievement.getCode(),
                     achievement.getName(),
@@ -368,42 +324,15 @@ public class UserController {
                     achievement.getRarity(),
                     true,
                     ua.getEarnedAt().toString()
-                ));
-            }
-            
-            // Add the next unearned achievement after the highest consecutive earned one (or first if none earned)
-            int nextIndex = highestConsecutiveEarnedIndex + 1;
-            if (nextIndex < categoryAchievements.size()) {
-                Achievement nextAchievement = categoryAchievements.get(nextIndex);
-                achievementDTOs.add(new AchievementDTO(
-                    nextAchievement.getId(),
-                    nextAchievement.getCode(),
-                    nextAchievement.getName(),
-                    nextAchievement.getDescription(),
-                    nextAchievement.getIcon(),
-                    nextAchievement.getCategory(),
-                    nextAchievement.getRarity(),
-                    false,
-                    null
-                ));
-            }
-        }
+                );
+            })
+            .collect(Collectors.toList());
         
-        // Sort final list by category, then by earned status (earned first), then by rarity
+        // Sort by category, then by rarity (higher first)
         achievementDTOs.sort((a1, a2) -> {
             int categoryCompare = a1.getCategory().compareTo(a2.getCategory());
             if (categoryCompare != 0) return categoryCompare;
-            
-            // Within same category, earned achievements first
-            int earnedCompare = Boolean.compare(a2.getEarned(), a1.getEarned());
-            if (earnedCompare != 0) return earnedCompare;
-            
-            // Then by rarity (lower rarity first for unearned, higher first for earned)
-            if (a1.getEarned() && a2.getEarned()) {
-                return Integer.compare(a2.getRarity(), a1.getRarity()); // Higher rarity first for earned
-            } else {
-                return Integer.compare(a1.getRarity(), a2.getRarity()); // Lower rarity first for unearned
-            }
+            return Integer.compare(a2.getRarity(), a1.getRarity()); // Higher rarity first
         });
         
         return ResponseEntity.ok(achievementDTOs);

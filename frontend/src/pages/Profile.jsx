@@ -259,26 +259,26 @@ const Profile = () => {
             ) : achievements.length > 0 ? (
               <>
                 <p className="section-description">
-                  Your earned achievements and the next achievement to unlock in each category.
+                  Your earned achievements.
                 </p>
                 <div className="achievements-grid">
                   {achievements.map((achievement) => (
                     <div
                       key={achievement.id}
-                      className={`achievement-card ${achievement.earned ? 'earned' : 'locked'}`}
+                      className="achievement-card earned"
                       title={achievement.description}
                     >
                       <div className="achievement-icon">{achievement.icon}</div>
                       <div className="achievement-content">
                         <div className="achievement-name">{achievement.name}</div>
                         <div className="achievement-description">{achievement.description}</div>
-                        {achievement.earned && achievement.earnedAt && (
+                        {achievement.earnedAt && (
                           <div className="achievement-date">
                             Earned: {new Date(achievement.earnedAt).toLocaleDateString()}
                           </div>
                         )}
                         <div className={`achievement-rarity rarity-${achievement.rarity}`}>
-                          {achievement.earned ? '✓ Earned' : 'Locked'}
+                          ✓ Earned
                         </div>
                       </div>
                     </div>
@@ -286,7 +286,7 @@ const Profile = () => {
                 </div>
                 <div className="achievements-summary">
                   <p>
-                    Earned: {achievements.filter(a => a.earned).length} achievement{achievements.filter(a => a.earned).length !== 1 ? 's' : ''}
+                    Earned: {achievements.length} achievement{achievements.length !== 1 ? 's' : ''}
                   </p>
                 </div>
               </>
