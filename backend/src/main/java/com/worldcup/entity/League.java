@@ -79,8 +79,9 @@ public class League {
     /**
      * Whether leaderboard achievements have been processed for this league.
      * Set to true after achievements are awarded when league finishes.
+     * Nullable to allow migration of existing data; defaults to false in application logic.
      */
-    @Column(name = "achievements_processed", nullable = false)
+    @Column(name = "achievements_processed")
     private Boolean achievementsProcessed = false;
 
     @PrePersist

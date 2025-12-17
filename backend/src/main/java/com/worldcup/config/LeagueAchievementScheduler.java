@@ -38,7 +38,10 @@ public class LeagueAchievementScheduler {
         
         // Find all leagues that have finished (endDate <= now) and haven't been processed
         List<League> finishedLeagues = leagueRepository.findFinishedLeagues(now).stream()
-            .filter(league -> !league.getAchievementsProcessed()) // Only process once
+            .filter(league -> {
+                Boolean processed = league.getAchievementsProcessed();
+                return processed == null || !processed; // Treat null as false (not processed)
+            })
             .toList();
         
         if (finishedLeagues.isEmpty()) {
