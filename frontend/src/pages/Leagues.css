@@ -343,6 +343,68 @@
   display: block;
 }
 
+.invite-code-section {
+  margin-top: var(--spacing-md);
+}
+
+.invite-code-details {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-sm);
+  background: var(--surface);
+}
+
+.invite-code-summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  padding: var(--spacing-xs);
+  list-style: none;
+  user-select: none;
+  transition: color var(--transition-base);
+}
+
+.invite-code-summary:hover {
+  color: var(--primary-500);
+}
+
+.invite-code-summary::-webkit-details-marker {
+  display: none;
+}
+
+.invite-code-summary::before {
+  content: '▶';
+  display: inline-block;
+  margin-right: var(--spacing-xs);
+  transition: transform var(--transition-base);
+  font-size: 0.7rem;
+}
+
+.invite-code-details[open] .invite-code-summary::before {
+  transform: rotate(90deg);
+}
+
+.invite-code-content {
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border-top: 1px solid var(--border);
+}
+
+.invite-code-value {
+  background: var(--surface-elevated);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  font-family: 'Courier New', monospace;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--primary-500);
+  border: 1px solid var(--border);
+  user-select: all;
+  flex: 1;
+  display: inline-block;
+}
+
 .members-list {
   display: flex;
   flex-direction: column;

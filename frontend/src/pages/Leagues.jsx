@@ -324,19 +324,6 @@ const Leagues = () => {
                       )}
                     </div>
                     <div className="league-actions">
-                      <div className="join-code-section">
-                        <span className="join-code-label">Join Code:</span>
-                        <code className="join-code" onClick={() => copyJoinCode(league.joinCode)}>
-                          {league.joinCode}
-                        </code>
-                        <button
-                          onClick={() => copyJoinCode(league.joinCode)}
-                          className="btn-icon"
-                          title="Copy join code"
-                        >
-                          📋
-                        </button>
-                      </div>
                       <div className="league-action-buttons">
                         <button
                           onClick={() => openInviteModal(league.id)}
@@ -487,6 +474,26 @@ const Leagues = () => {
                           Friends can scan this QR code with their phone camera to open the invite
                           link.
                         </p>
+                      </div>
+                      <div className="invite-code-section">
+                        <details className="invite-code-details">
+                          <summary className="invite-code-summary">Show Join Code (for manual entry)</summary>
+                          <div className="invite-code-content">
+                            <p className="form-hint" style={{ marginBottom: 'var(--spacing-sm)' }}>
+                              Share this code if someone prefers to enter it manually:
+                            </p>
+                            <div className="invite-link-row">
+                              <code className="invite-code-value">{league.joinCode}</code>
+                              <button
+                                onClick={() => copyJoinCode(league.joinCode)}
+                                className="btn-secondary btn-small"
+                                type="button"
+                              >
+                                Copy Code
+                              </button>
+                            </div>
+                          </div>
+                        </details>
                       </div>
                     </div>
                   );
