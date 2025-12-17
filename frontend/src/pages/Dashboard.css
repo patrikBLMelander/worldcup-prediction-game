@@ -55,6 +55,23 @@
   margin-bottom: var(--spacing-3xl);
 }
 
+.stat-card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.stat-card-link:hover .stat-card {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+  border-color: var(--primary-500);
+  background: var(--surface-elevated);
+}
+
+.stat-card-link:hover .stat-card::before {
+  transform: scaleY(1);
+}
+
 .stat-card {
   background: var(--surface);
   border-radius: var(--radius-xl);
@@ -67,6 +84,7 @@
   border: 1px solid var(--border);
   position: relative;
   overflow: hidden;
+  cursor: pointer;
 }
 
 .stat-card::before {
@@ -81,16 +99,6 @@
   transition: transform var(--transition-base);
 }
 
-.stat-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
-  border-color: var(--primary-500);
-  background: var(--surface-elevated);
-}
-
-.stat-card:hover::before {
-  transform: scaleY(1);
-}
 
 .stat-icon {
   font-size: 3.5rem;

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useWebSocket } from '../hooks/useWebSocket';
 import apiClient from '../config/api';
@@ -24,8 +25,24 @@ const Matches = () => {
   const [expandedFinishedMatches, setExpandedFinishedMatches] = useState(new Set());
   const [expandedMobileMatches, setExpandedMobileMatches] = useState(new Set()); // Track expanded matches on mobile
   const [isMobile, setIsMobile] = useState(false);
-  const [activeTab, setActiveTab] = useState('upcoming'); // 'upcoming' or 'results'
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(() => {
+    // Initialize from URL parameter if present
+    const tabParam = searchParams.get('tab');
+    return tabParam === 'results' ? 'results' : 'upcoming';
+  });
   const debounceTimers = useRef({});
+
+  // Sync activeTab with URL parameter (for browser back/forward navigation)
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'results' || tabParam === 'upcoming') {
+      setActiveTab(tabParam);
+    } else if (!tabParam) {
+      // If no tab param, default to upcoming
+      setActiveTab('upcoming');
+    }
+  }, [searchParams]);
 
   // Detect mobile viewport
   useEffect(() => {
@@ -376,7 +393,10 @@ const Matches = () => {
         <div className="matches-tabs">
           <button
             className={`tab-button ${activeTab === 'upcoming' ? 'active' : ''}`}
-            onClick={() => setActiveTab('upcoming')}
+            onClick={() => {
+              setActiveTab('upcoming');
+              setSearchParams({ tab: 'upcoming' }, { replace: true });
+            }}
           >
             <span className="tab-icon">📅</span>
             <span className="tab-label">Upcoming</span>
@@ -386,7 +406,10 @@ const Matches = () => {
           </button>
           <button
             className={`tab-button ${activeTab === 'results' ? 'active' : ''}`}
-            onClick={() => setActiveTab('results')}
+            onClick={() => {
+              setActiveTab('results');
+              setSearchParams({ tab: 'results' }, { replace: true });
+            }}
           >
             <span className="tab-icon">🏆</span>
             <span className="tab-label">Results</span>

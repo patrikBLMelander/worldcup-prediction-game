@@ -25,6 +25,8 @@ public class PredictionService {
 
     private final PredictionRepository predictionRepository;
     private final MatchService matchService;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private AchievementService achievementService; // Optional - may not be available during startup
 
     public Prediction createOrUpdatePrediction(User user, Long matchId, 
                                               Integer predictedHomeScore, 
@@ -107,6 +109,15 @@ public class PredictionService {
                 );
                 prediction.setPoints(points);
                 predictionRepository.save(prediction);
+                
+                // Check achievements after points are calculated
+                if (achievementService != null) {
+                    try {
+                        achievementService.checkAchievementsAfterMatchResult(prediction.getUser(), prediction);
+                    } catch (Exception e) {
+                        log.error("Error checking achievements for prediction {}: {}", prediction.getId(), e.getMessage());
+                    }
+                }
             } catch (Exception e) {
                 // Log error but continue processing other predictions
                 log.error("Error calculating points for prediction {}: {}", prediction.getId(), e.getMessage());

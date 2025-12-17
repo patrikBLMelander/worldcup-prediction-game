@@ -100,37 +100,45 @@ const Dashboard = () => {
         </div>
 
         <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-icon">🏆</div>
-            <div className="stat-content">
-              <h3>{user?.totalPoints || 0}</h3>
-              <p>Total Points</p>
+          <Link to="/profile" className="stat-card-link">
+            <div className="stat-card">
+              <div className="stat-icon">🏆</div>
+              <div className="stat-content">
+                <h3>{user?.totalPoints || 0}</h3>
+                <p>Total Points</p>
+              </div>
             </div>
-          </div>
+          </Link>
 
-          <div className="stat-card">
-            <div className="stat-icon">🥇</div>
-            <div className="stat-content">
-              <h3>#{stats.leaderboardPosition}</h3>
-              <p>Leaderboard Position</p>
+          <Link to="/leaderboard" className="stat-card-link">
+            <div className="stat-card">
+              <div className="stat-icon">🥇</div>
+              <div className="stat-content">
+                <h3>#{stats.leaderboardPosition}</h3>
+                <p>Leaderboard Position</p>
+              </div>
             </div>
-          </div>
+          </Link>
 
-          <div className="stat-card">
-            <div className="stat-icon">🎯</div>
-            <div className="stat-content">
-              <h3>{stats.myPredictions}</h3>
-              <p>My Predictions</p>
+          <Link to="/matches?tab=results" className="stat-card-link">
+            <div className="stat-card">
+              <div className="stat-icon">🎯</div>
+              <div className="stat-content">
+                <h3>{stats.myPredictions}</h3>
+                <p>My Predictions</p>
+              </div>
             </div>
-          </div>
+          </Link>
 
-          <div className="stat-card">
-            <div className="stat-icon">⚽</div>
-            <div className="stat-content">
-              <h3>{stats.scheduledMatches}</h3>
-              <p>Scheduled Matches</p>
+          <Link to="/matches?tab=upcoming" className="stat-card-link">
+            <div className="stat-card">
+              <div className="stat-icon">⚽</div>
+              <div className="stat-content">
+                <h3>{stats.scheduledMatches}</h3>
+                <p>Scheduled Matches</p>
+              </div>
             </div>
-          </div>
+          </Link>
         </div>
 
         {upcomingMatches.length > 0 && (

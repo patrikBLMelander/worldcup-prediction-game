@@ -6,6 +6,7 @@ import com.worldcup.entity.Match;
 import com.worldcup.entity.Prediction;
 import com.worldcup.entity.User;
 import com.worldcup.security.CurrentUser;
+import com.worldcup.service.AchievementService;
 import com.worldcup.service.PredictionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 public class PredictionController {
 
     private final PredictionService predictionService;
+    private final AchievementService achievementService;
     private final CurrentUser currentUser;
 
     @PostMapping
@@ -35,6 +37,9 @@ public class PredictionController {
                 request.getPredictedHomeScore(),
                 request.getPredictedAwayScore()
         );
+
+        // Check for achievements after prediction is made
+        achievementService.checkAchievementsAfterPrediction(user);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(convertToDTO(prediction));
     }

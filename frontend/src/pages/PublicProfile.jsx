@@ -11,6 +11,8 @@ const PublicProfile = () => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [achievements, setAchievements] = useState([]);
+  const [achievementsLoading, setAchievementsLoading] = useState(true);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -27,8 +29,20 @@ const PublicProfile = () => {
       }
     };
 
+    const fetchAchievements = async () => {
+      try {
+        const response = await apiClient.get(`/users/${userId}/achievements`);
+        setAchievements(response.data);
+      } catch (err) {
+        console.error('Failed to fetch achievements:', err);
+      } finally {
+        setAchievementsLoading(false);
+      }
+    };
+
     if (userId) {
       fetchProfile();
+      fetchAchievements();
     }
   }, [userId]);
 
@@ -130,6 +144,45 @@ const PublicProfile = () => {
             </>
           )}
         </div>
+
+        {/* Achievements */}
+        {achievements.length > 0 && (
+          <section className="profile-section">
+            <h2>🏆 Achievements</h2>
+            {achievementsLoading ? (
+              <div className="loading">Loading achievements...</div>
+            ) : (
+              <>
+                <p className="section-description">
+                  {profile.screenName || 'This player'} has earned {achievements.length} achievement{achievements.length !== 1 ? 's' : ''}!
+                </p>
+                <div className="achievements-grid">
+                  {achievements.map((achievement) => (
+                    <div
+                      key={achievement.id}
+                      className="achievement-card earned"
+                      title={achievement.description}
+                    >
+                      <div className="achievement-icon">{achievement.icon}</div>
+                      <div className="achievement-content">
+                        <div className="achievement-name">{achievement.name}</div>
+                        <div className="achievement-description">{achievement.description}</div>
+                        {achievement.earnedAt && (
+                          <div className="achievement-date">
+                            Earned: {new Date(achievement.earnedAt).toLocaleDateString()}
+                          </div>
+                        )}
+                        <div className={`achievement-rarity rarity-${achievement.rarity}`}>
+                          ✓ Earned
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+        )}
 
         {/* Detailed Statistics */}
         {profile.statistics && profile.statistics.totalPredictions > 0 && (

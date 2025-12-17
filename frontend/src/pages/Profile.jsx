@@ -31,6 +31,10 @@ const Profile = () => {
   const [statisticsLoading, setStatisticsLoading] = useState(true);
   const [performanceHistory, setPerformanceHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  
+  // Achievements state
+  const [achievements, setAchievements] = useState([]);
+  const [achievementsLoading, setAchievementsLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
@@ -62,9 +66,21 @@ const Profile = () => {
       }
     };
 
+    const fetchAchievements = async () => {
+      try {
+        const response = await apiClient.get('/users/me/achievements');
+        setAchievements(response.data);
+      } catch (error) {
+        console.error('Failed to fetch achievements:', error);
+      } finally {
+        setAchievementsLoading(false);
+      }
+    };
+
     if (user) {
       fetchStatistics();
       fetchPerformanceHistory();
+      fetchAchievements();
     }
   }, [user]);
 
@@ -231,6 +247,52 @@ const Profile = () => {
             ) : (
               <p className="section-description">
                 No statistics available yet. Make some predictions and wait for matches to finish!
+              </p>
+            )}
+          </section>
+
+          {/* Achievements */}
+          <section className="profile-section">
+            <h2>🏆 Achievements</h2>
+            {achievementsLoading ? (
+              <div className="loading">Loading achievements...</div>
+            ) : achievements.length > 0 ? (
+              <>
+                <p className="section-description">
+                  Your earned achievements and the next achievement to unlock in each category.
+                </p>
+                <div className="achievements-grid">
+                  {achievements.map((achievement) => (
+                    <div
+                      key={achievement.id}
+                      className={`achievement-card ${achievement.earned ? 'earned' : 'locked'}`}
+                      title={achievement.description}
+                    >
+                      <div className="achievement-icon">{achievement.icon}</div>
+                      <div className="achievement-content">
+                        <div className="achievement-name">{achievement.name}</div>
+                        <div className="achievement-description">{achievement.description}</div>
+                        {achievement.earned && achievement.earnedAt && (
+                          <div className="achievement-date">
+                            Earned: {new Date(achievement.earnedAt).toLocaleDateString()}
+                          </div>
+                        )}
+                        <div className={`achievement-rarity rarity-${achievement.rarity}`}>
+                          {achievement.earned ? '✓ Earned' : 'Locked'}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="achievements-summary">
+                  <p>
+                    Earned: {achievements.filter(a => a.earned).length} achievement{achievements.filter(a => a.earned).length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              </>
+            ) : (
+              <p className="section-description">
+                No achievements available yet.
               </p>
             )}
           </section>

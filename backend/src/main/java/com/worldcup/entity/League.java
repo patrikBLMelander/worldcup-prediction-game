@@ -76,6 +76,13 @@ public class League {
     @Column(name = "locked_at")
     private LocalDateTime lockedAt;
 
+    /**
+     * Whether leaderboard achievements have been processed for this league.
+     * Set to true after achievements are awarded when league finishes.
+     */
+    @Column(name = "achievements_processed", nullable = false)
+    private Boolean achievementsProcessed = false;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {

@@ -1,8 +1,9 @@
 package com.worldcup.repository;
 
+import com.worldcup.entity.Match;
+import com.worldcup.entity.MatchStatus;
 import com.worldcup.entity.Prediction;
 import com.worldcup.entity.User;
-import com.worldcup.entity.Match;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -18,6 +19,18 @@ public interface PredictionRepository extends JpaRepository<Prediction, Long> {
     
     @Query("SELECT p FROM Prediction p JOIN FETCH p.match WHERE p.user = :user")
     List<Prediction> findByUserWithMatch(@Param("user") User user);
+    
+    /**
+     * Optimized query to get finished predictions for a user, sorted by match date.
+     * Used for achievement checking to avoid loading all predictions.
+     */
+    @Query("SELECT p FROM Prediction p JOIN FETCH p.match " +
+           "WHERE p.user = :user AND p.match.status = :status " +
+           "ORDER BY p.match.matchDate ASC")
+    List<Prediction> findByUserAndMatchStatus(
+        @Param("user") User user, 
+        @Param("status") MatchStatus status
+    );
     
     List<Prediction> findByMatch(Match match);
     

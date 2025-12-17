@@ -1,5 +1,6 @@
 package com.worldcup.controller;
 
+import com.worldcup.dto.AchievementDTO;
 import com.worldcup.dto.ChangePasswordRequest;
 import com.worldcup.dto.FinishedPredictionDTO;
 import com.worldcup.dto.LeaderboardEntryDTO;
@@ -12,8 +13,12 @@ import com.worldcup.entity.Match;
 import com.worldcup.entity.MatchStatus;
 import com.worldcup.entity.Prediction;
 import com.worldcup.entity.User;
+import com.worldcup.entity.Achievement;
+import com.worldcup.entity.UserAchievement;
+import com.worldcup.repository.AchievementRepository;
 import com.worldcup.repository.MatchRepository;
 import com.worldcup.repository.PredictionRepository;
+import com.worldcup.repository.UserAchievementRepository;
 import com.worldcup.repository.UserRepository;
 import com.worldcup.security.CurrentUser;
 import com.worldcup.service.PredictionService;
@@ -25,7 +30,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -41,6 +48,8 @@ public class UserController {
     private final PredictionRepository predictionRepository;
     private final UserService userService;
     private final MatchRepository matchRepository;
+    private final AchievementRepository achievementRepository;
+    private final UserAchievementRepository userAchievementRepository;
 
     @GetMapping("/me")
     public ResponseEntity<UserProfileDTO> getMyProfile() {
@@ -293,6 +302,154 @@ public class UserController {
         );
         
         return ResponseEntity.ok(profile);
+    }
+
+    @GetMapping("/me/achievements")
+    public ResponseEntity<List<AchievementDTO>> getMyAchievements() {
+        User user = currentUser.getCurrentUserOrThrow();
+        
+        // Get all available achievements, ordered by category and rarity (ascending for "next" logic)
+        List<Achievement> allAchievements = achievementRepository.findByActiveTrueOrderByCategoryAscRarityDesc();
+        
+        // Get user's earned achievements
+        List<UserAchievement> userAchievements = userAchievementRepository.findByUserOrderByEarnedAtDesc(user);
+        Set<String> earnedCodes = userAchievements.stream()
+            .map(ua -> ua.getAchievement().getCode())
+            .collect(Collectors.toSet());
+        
+        // Create a map of earned achievements by code for quick lookup
+        Map<String, UserAchievement> earnedMap = userAchievements.stream()
+            .collect(Collectors.toMap(
+                ua -> ua.getAchievement().getCode(),
+                ua -> ua
+            ));
+        
+        // Group achievements by category
+        Map<String, List<Achievement>> achievementsByCategory = allAchievements.stream()
+            .collect(Collectors.groupingBy(Achievement::getCategory));
+        
+        // For each category, show earned achievements sequentially + the next unearned one
+        List<AchievementDTO> achievementDTOs = new ArrayList<>();
+        
+        for (Map.Entry<String, List<Achievement>> categoryEntry : achievementsByCategory.entrySet()) {
+            List<Achievement> categoryAchievements = categoryEntry.getValue();
+            
+            // Sort achievements by ID (creation order) to maintain progression sequence
+            categoryAchievements.sort((a1, a2) -> Long.compare(a1.getId(), a2.getId()));
+            
+            // Find the highest earned achievement index in the progression
+            // We need to find the highest consecutive earned achievement from the start
+            int highestConsecutiveEarnedIndex = -1;
+            for (int i = 0; i < categoryAchievements.size(); i++) {
+                if (earnedCodes.contains(categoryAchievements.get(i).getCode())) {
+                    highestConsecutiveEarnedIndex = i;
+                } else {
+                    // Stop at first unearned achievement (must be consecutive from start)
+                    break;
+                }
+            }
+            
+            // Add all earned achievements (consecutive from start)
+            for (int i = 0; i <= highestConsecutiveEarnedIndex; i++) {
+                Achievement achievement = categoryAchievements.get(i);
+                UserAchievement ua = earnedMap.get(achievement.getCode());
+                if (ua == null) {
+                    log.warn("User achievement not found in map for achievement {} and user {}", 
+                            achievement.getCode(), user.getId());
+                    continue; // Skip if data inconsistency
+                }
+                achievementDTOs.add(new AchievementDTO(
+                    achievement.getId(),
+                    achievement.getCode(),
+                    achievement.getName(),
+                    achievement.getDescription(),
+                    achievement.getIcon(),
+                    achievement.getCategory(),
+                    achievement.getRarity(),
+                    true,
+                    ua.getEarnedAt().toString()
+                ));
+            }
+            
+            // Add the next unearned achievement after the highest consecutive earned one (or first if none earned)
+            int nextIndex = highestConsecutiveEarnedIndex + 1;
+            if (nextIndex < categoryAchievements.size()) {
+                Achievement nextAchievement = categoryAchievements.get(nextIndex);
+                achievementDTOs.add(new AchievementDTO(
+                    nextAchievement.getId(),
+                    nextAchievement.getCode(),
+                    nextAchievement.getName(),
+                    nextAchievement.getDescription(),
+                    nextAchievement.getIcon(),
+                    nextAchievement.getCategory(),
+                    nextAchievement.getRarity(),
+                    false,
+                    null
+                ));
+            }
+        }
+        
+        // Sort final list by category, then by earned status (earned first), then by rarity
+        achievementDTOs.sort((a1, a2) -> {
+            int categoryCompare = a1.getCategory().compareTo(a2.getCategory());
+            if (categoryCompare != 0) return categoryCompare;
+            
+            // Within same category, earned achievements first
+            int earnedCompare = Boolean.compare(a2.getEarned(), a1.getEarned());
+            if (earnedCompare != 0) return earnedCompare;
+            
+            // Then by rarity (lower rarity first for unearned, higher first for earned)
+            if (a1.getEarned() && a2.getEarned()) {
+                return Integer.compare(a2.getRarity(), a1.getRarity()); // Higher rarity first for earned
+            } else {
+                return Integer.compare(a1.getRarity(), a2.getRarity()); // Lower rarity first for unearned
+            }
+        });
+        
+        return ResponseEntity.ok(achievementDTOs);
+    }
+
+    @GetMapping("/{userId}/achievements")
+    public ResponseEntity<List<AchievementDTO>> getUserAchievements(@PathVariable Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        
+        // Get all available achievements
+        List<Achievement> allAchievements = achievementRepository.findByActiveTrueOrderByCategoryAscRarityDesc();
+        
+        // Get user's earned achievements
+        List<UserAchievement> userAchievements = userAchievementRepository.findByUserOrderByEarnedAtDesc(user);
+        Set<String> earnedCodes = userAchievements.stream()
+            .map(ua -> ua.getAchievement().getCode())
+            .collect(Collectors.toSet());
+        
+        // Create a map of earned achievements by code for quick lookup
+        Map<String, UserAchievement> earnedMap = userAchievements.stream()
+            .collect(Collectors.toMap(
+                ua -> ua.getAchievement().getCode(),
+                ua -> ua
+            ));
+        
+        // Convert to DTOs - only show earned achievements for public profile
+        List<AchievementDTO> achievementDTOs = allAchievements.stream()
+            .filter(achievement -> earnedCodes.contains(achievement.getCode())) // Only show earned
+            .map(achievement -> {
+                UserAchievement ua = earnedMap.get(achievement.getCode());
+                return new AchievementDTO(
+                    achievement.getId(),
+                    achievement.getCode(),
+                    achievement.getName(),
+                    achievement.getDescription(),
+                    achievement.getIcon(),
+                    achievement.getCategory(),
+                    achievement.getRarity(),
+                    true, // Always true since we filtered
+                    ua.getEarnedAt().toString()
+                );
+            })
+            .collect(Collectors.toList());
+        
+        return ResponseEntity.ok(achievementDTOs);
     }
 }
 
