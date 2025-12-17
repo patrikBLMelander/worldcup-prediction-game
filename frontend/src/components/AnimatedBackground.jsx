@@ -31,10 +31,11 @@ const AnimatedBackground = () => {
       reset() {
         this.x = Math.random() * canvas.width;
         this.y = Math.random() * canvas.height;
-        this.size = Math.random() * 2 + 0.5;
-        this.speedX = (Math.random() - 0.5) * 0.5;
-        this.speedY = Math.random() * 0.5 + 0.2;
-        this.opacity = Math.random() * 0.5 + 0.2;
+        // Slightly smaller, finer pixels
+        this.size = Math.random() * 0.8 + 0.7; // ~0.7 - 1.5px
+        this.speedX = (Math.random() - 0.5) * 0.2; // gentle drift horizontally
+        this.speedY = Math.random() * 0.25 + 0.08; // slow downward movement
+        this.opacity = Math.random() * 0.4 + 0.4; // 0.4 - 0.8
         this.trail = [];
         this.maxTrailLength = 5;
         this.isFastStar = false;
@@ -67,19 +68,19 @@ const AnimatedBackground = () => {
           const trailOpacity = (point.opacity * (i + 1)) / this.trail.length * 0.3;
           ctx.beginPath();
           ctx.arc(point.x, point.y, this.size * 0.5, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(99, 102, 241, ${trailOpacity})`;
+          ctx.fillStyle = `rgba(129, 230, 217, ${trailOpacity})`; // teal trail for contrast
           ctx.fill();
         }
 
         // Draw main particle
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(99, 102, 241, ${this.opacity})`;
+      ctx.fillStyle = `rgba(129, 230, 217, ${this.opacity})`; // teal pixel
         ctx.fill();
 
         // Add glow effect
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = 'rgba(99, 102, 241, 0.8)';
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = 'rgba(129, 230, 217, 0.9)';
         ctx.fill();
         ctx.shadowBlur = 0;
       }
@@ -187,8 +188,10 @@ const AnimatedBackground = () => {
       }
     }
 
-    // Create regular particles
-    const particleCount = Math.min(Math.floor((canvas.width * canvas.height) / 15000), 80);
+    // Create regular particles (enough to be clearly visible on all pages)
+    const area = canvas.width * canvas.height;
+    const baseDensity = area / 60000;
+    const particleCount = Math.min(Math.max(Math.floor(baseDensity), 24), 48);
     for (let i = 0; i < particleCount; i++) {
       particles.push(new Particle());
     }
@@ -200,10 +203,10 @@ const AnimatedBackground = () => {
       fastStars.push(new FastStar());
     }
 
-    // Timer for spawning fast stars (every 15-20 seconds)
+    // Timer for spawning fast stars (roughly every 18-23 seconds)
     let lastFastStarTime = Date.now();
-    const minFastStarInterval = 15000; // 15 seconds minimum
-    const maxFastStarInterval = 20000; // 20 seconds maximum
+    const minFastStarInterval = 18000; // 18 seconds minimum
+    const maxFastStarInterval = 23000; // 23 seconds maximum
 
     // Draw connections between nearby particles
     const drawConnections = () => {
