@@ -151,7 +151,6 @@
 }
 
 .btn-primary {
-  width: 100%;
   padding: var(--spacing-md) var(--spacing-xl);
   background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%);
   color: white;
@@ -164,6 +163,24 @@
   margin-top: var(--spacing-md);
   box-shadow: var(--shadow-md);
   letter-spacing: 0.3px;
+}
+
+/* Default full-width primary button inside auth forms */
+.auth-card form .btn-primary {
+  width: 100%;
+}
+
+/* Invite actions: side-by-side equal-width buttons */
+.invite-actions {
+  display: flex;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-xl);
+}
+
+.invite-actions .btn-primary,
+.invite-actions .btn-secondary {
+  width: 100%;
+  flex: 1;
 }
 
 .btn-primary:hover:not(:disabled) {

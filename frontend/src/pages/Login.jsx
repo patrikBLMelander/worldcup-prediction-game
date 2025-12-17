@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import ScreenNameModal from '../components/ScreenNameModal';
 import CountryFlagsBackground from '../components/CountryFlagsBackground';
+import apiClient from '../config/api';
 import './Login.css';
 
 const Login = () => {
@@ -36,26 +37,59 @@ const Login = () => {
   const [hasNavigated, setHasNavigated] = useState(false);
   const [loginSuccess, setLoginSuccess] = useState(false);
 
+  const joinPendingLeagueIfAny = useCallback(async () => {
+    const code = localStorage.getItem('pendingLeagueInvite');
+    if (!code) return false;
+    try {
+      await apiClient.post('/leagues/join', { joinCode: code });
+      localStorage.removeItem('pendingLeagueInvite');
+      return true;
+    } catch (err) {
+      console.error('Failed to join league from pending invite after login:', err);
+      localStorage.removeItem('pendingLeagueInvite');
+      setError(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          'Failed to join league from invite.'
+      );
+      return false;
+    }
+  }, []);
+
   // Check if user needs to set screen name after login
   useEffect(() => {
     // Only check after successful login (when user is loaded and we're not loading)
     if (loginSuccess && user && !loading && !hasNavigated) {
-      if (!user.screenName || user.screenName === null) {
-        // User has no screen name - show modal
-        setShowScreenNameModal(true);
-      } else {
-        // User has screen name - navigate to dashboard
+      const handlePostLogin = async () => {
+        if (!user.screenName || user.screenName === null) {
+          // User has no screen name - show modal
+          setShowScreenNameModal(true);
+          return;
+        }
+
+        const joinedFromInvite = await joinPendingLeagueIfAny();
         setHasNavigated(true);
-        navigate('/dashboard');
-      }
+        if (joinedFromInvite) {
+          navigate('/leagues');
+        } else {
+          navigate('/dashboard');
+        }
+      };
+
+      handlePostLogin();
     }
-  }, [user, loading, navigate, hasNavigated, loginSuccess]);
+  }, [user, loading, navigate, hasNavigated, loginSuccess, joinPendingLeagueIfAny]);
 
   const handleScreenNameSave = async (screenName) => {
     await updateScreenName(screenName);
     setShowScreenNameModal(false);
+    const joinedFromInvite = await joinPendingLeagueIfAny();
     setHasNavigated(true);
-    navigate('/dashboard');
+    if (joinedFromInvite) {
+      navigate('/leagues');
+    } else {
+      navigate('/dashboard');
+    }
   };
 
   return (

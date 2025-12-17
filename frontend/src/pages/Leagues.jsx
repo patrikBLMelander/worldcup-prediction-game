@@ -28,6 +28,9 @@ const Leagues = () => {
   const [members, setMembers] = useState([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [showMembersModal, setShowMembersModal] = useState(false);
+  // Invite modal state
+  const [inviteLeagueId, setInviteLeagueId] = useState(null);
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
   useEffect(() => {
     fetchLeagues();
@@ -135,6 +138,22 @@ const Leagues = () => {
     setShowMembersModal(false);
     setSelectedLeagueId(null);
     setMembers([]);
+  };
+
+  const openInviteModal = (leagueId) => {
+    setInviteLeagueId(leagueId);
+    setShowInviteModal(true);
+  };
+
+  const closeInviteModal = () => {
+    setInviteLeagueId(null);
+    setShowInviteModal(false);
+  };
+
+  const getInviteUrlForLeague = (league) => {
+    if (!league) return '';
+    const origin = window.location.origin;
+    return `${origin}/invite/${league.joinCode}`;
   };
 
   if (loading) {
@@ -320,6 +339,12 @@ const Leagues = () => {
                       </div>
                       <div className="league-action-buttons">
                         <button
+                          onClick={() => openInviteModal(league.id)}
+                          className="btn-secondary btn-small"
+                        >
+                          Invite Friends
+                        </button>
+                        <button
                           onClick={() => fetchLeagueMembers(league.id)}
                           className="btn-secondary btn-small"
                         >
@@ -389,6 +414,83 @@ const Leagues = () => {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Invite Modal */}
+        {showInviteModal && (
+          <>
+            <div className="modal-overlay" onClick={closeInviteModal} />
+            <div className="members-modal">
+              <div className="members-modal-header">
+                <h2>
+                  Invite to{' '}
+                  {leagues.find(l => l.id === inviteLeagueId)?.name || 'League'}
+                </h2>
+                <button
+                  onClick={closeInviteModal}
+                  className="modal-close-button"
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="members-modal-content">
+                {(() => {
+                  const league = leagues.find(l => l.id === inviteLeagueId);
+                  const inviteUrl = getInviteUrlForLeague(league);
+                  if (!league) {
+                    return <p className="section-description">League not found.</p>;
+                  }
+
+                  const handleCopyLink = () => {
+                    navigator.clipboard.writeText(inviteUrl);
+                  };
+
+                  return (
+                    <div className="invite-content">
+                      <p className="section-description">
+                        Share this link or QR code so friends can easily join your league.
+                      </p>
+                      <div className="invite-link-section">
+                        <label className="league-info-label">Invite Link</label>
+                        <div className="invite-link-row">
+                          <input
+                            type="text"
+                            readOnly
+                            value={inviteUrl}
+                            className="invite-link-input"
+                            onFocus={(e) => e.target.select()}
+                          />
+                          <button
+                            onClick={handleCopyLink}
+                            className="btn-secondary btn-small"
+                            type="button"
+                          >
+                            Copy
+                          </button>
+                        </div>
+                      </div>
+                      <div className="invite-qr-section">
+                        <label className="league-info-label">QR Code</label>
+                        <div className="invite-qr-wrapper">
+                          <img
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(
+                              inviteUrl
+                            )}`}
+                            alt="League invite QR code"
+                          />
+                        </div>
+                        <p className="form-hint">
+                          Friends can scan this QR code with their phone camera to open the invite
+                          link.
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </>
