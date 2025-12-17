@@ -92,6 +92,17 @@ const Invite = () => {
             </div>
           </>
         )}
+
+        {status === 'error' && (
+          <div className="invite-actions">
+            <button className="btn-primary" onClick={() => navigate('/login')}>
+              Go to Login
+            </button>
+            <button className="btn-secondary" onClick={() => navigate('/dashboard')}>
+              Go to Dashboard
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

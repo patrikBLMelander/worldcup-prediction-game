@@ -179,8 +179,36 @@
 
 .invite-actions .btn-primary,
 .invite-actions .btn-secondary {
-  width: 100%;
   flex: 1;
+  width: 100%;
+  padding: var(--spacing-md) var(--spacing-lg);
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  border: none;
+  box-shadow: var(--shadow-md);
+  letter-spacing: 0.3px;
+  min-height: 48px;
+}
+
+.invite-actions .btn-secondary {
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  border: 2px solid var(--border);
+}
+
+.invite-actions .btn-secondary:hover {
+  background: var(--surface);
+  border-color: var(--primary-500);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  color: var(--primary-400);
+}
+
+.invite-actions .btn-primary {
+  margin-top: 0;
 }
 
 .btn-primary:hover:not(:disabled) {

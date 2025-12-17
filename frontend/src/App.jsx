@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AnimatedBackground from './components/AnimatedBackground';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Invite from './pages/Invite';
 import Dashboard from './pages/Dashboard';
 import Matches from './pages/Matches';
 import Leaderboard from './pages/Leaderboard';
@@ -44,6 +45,10 @@ function App() {
         <Route 
           path="/register" 
           element={shouldRedirect ? <Navigate to="/dashboard" replace /> : <Register />} 
+        />
+        <Route 
+          path="/invite/:joinCode" 
+          element={<Invite />} 
         />
 
         {/* Protected routes */}
