@@ -21,14 +21,20 @@ const Login = () => {
     setError('');
     setLoading(true);
 
-    const result = await login(email, password);
-    
-    if (result.success) {
-      // User will be loaded by AuthContext, check in useEffect
-      setLoginSuccess(true);
-      setLoading(false);
-    } else {
-      setError(result.error);
+    try {
+      const result = await login(email, password);
+      
+      if (result.success) {
+        // User will be loaded by AuthContext, check in useEffect
+        setLoginSuccess(true);
+        setLoading(false);
+      } else {
+        setError(result.error);
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      setError('Login failed. Please try again.');
       setLoading(false);
     }
   };
@@ -39,19 +45,44 @@ const Login = () => {
 
   const joinPendingLeagueIfAny = useCallback(async () => {
     const code = localStorage.getItem('pendingLeagueInvite');
-    if (!code) return false;
+    if (!code) {
+      console.log('No pending invite code found');
+      return false;
+    }
+    
+    console.log('joinPendingLeagueIfAny: Found code:', code);
+    
+    // Wait a bit to ensure token is set in apiClient
+    console.log('Waiting for token to be set...');
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Verify token is set
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.error('No token found after login, cannot join league');
+      setError('Authentication token not found. Please try logging in again.');
+      return false;
+    }
+    
     try {
-      await apiClient.post('/leagues/join', { joinCode: code });
+      console.log('Calling /leagues/join with code:', code);
+      const response = await apiClient.post('/leagues/join', { joinCode: code });
+      console.log('Join league response:', response.data);
       localStorage.removeItem('pendingLeagueInvite');
+      console.log('Successfully joined league and removed pending invite');
       return true;
     } catch (err) {
       console.error('Failed to join league from pending invite after login:', err);
-      localStorage.removeItem('pendingLeagueInvite');
-      setError(
-        err.response?.data?.error ||
-          err.response?.data?.message ||
-          'Failed to join league from invite.'
-      );
+      console.error('Error details:', {
+        status: err.response?.status,
+        data: err.response?.data,
+        message: err.message
+      });
+      // Don't remove the code on error - redirect to invite page so user can see error and try again
+      const errorMsg = err.response?.data?.error ||
+        err.response?.data?.message ||
+        'Failed to join league from invite.';
+      setError(errorMsg);
       return false;
     }
   }, []);
@@ -59,19 +90,47 @@ const Login = () => {
   // Check if user needs to set screen name after login
   useEffect(() => {
     // Only check after successful login (when user is loaded and we're not loading)
+    // Also wait for AuthContext to finish loading
     if (loginSuccess && user && !loading && !hasNavigated) {
       const handlePostLogin = async () => {
+        console.log('Post-login handler running, user:', user?.email, 'hasScreenName:', !!user?.screenName);
+        
+        // Wait a bit more to ensure everything is ready
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         if (!user.screenName || user.screenName === null) {
           // User has no screen name - show modal
+          console.log('User needs screen name, showing modal');
           setShowScreenNameModal(true);
           return;
         }
 
-        const joinedFromInvite = await joinPendingLeagueIfAny();
-        setHasNavigated(true);
-        if (joinedFromInvite) {
-          navigate('/leagues');
+        // Check if there's a pending invite
+        const pendingCode = localStorage.getItem('pendingLeagueInvite');
+        console.log('Pending invite code:', pendingCode);
+        
+        if (pendingCode) {
+          console.log('Attempting to join league with code:', pendingCode);
+          try {
+            const joinedFromInvite = await joinPendingLeagueIfAny();
+            console.log('Join result:', joinedFromInvite);
+            setHasNavigated(true);
+            if (joinedFromInvite) {
+              console.log('Successfully joined, navigating to /leagues');
+              navigate('/leagues');
+            } else {
+              // If join failed, redirect back to invite page so user can see error and try again
+              console.log('Join failed, redirecting to invite page');
+              navigate(`/invite/${pendingCode}`);
+            }
+          } catch (err) {
+            console.error('Error in joinPendingLeagueIfAny:', err);
+            setHasNavigated(true);
+            navigate(`/invite/${pendingCode}`);
+          }
         } else {
+          console.log('No pending invite, navigating to dashboard');
+          setHasNavigated(true);
           navigate('/dashboard');
         }
       };
@@ -83,11 +142,20 @@ const Login = () => {
   const handleScreenNameSave = async (screenName) => {
     await updateScreenName(screenName);
     setShowScreenNameModal(false);
-    const joinedFromInvite = await joinPendingLeagueIfAny();
-    setHasNavigated(true);
-    if (joinedFromInvite) {
-      navigate('/leagues');
+    
+    // Check if there's a pending invite
+    const pendingCode = localStorage.getItem('pendingLeagueInvite');
+    if (pendingCode) {
+      const joinedFromInvite = await joinPendingLeagueIfAny();
+      setHasNavigated(true);
+      if (joinedFromInvite) {
+        navigate('/leagues');
+      } else {
+        // If join failed, redirect back to invite page so user can see error and try again
+        navigate(`/invite/${pendingCode}`);
+      }
     } else {
+      setHasNavigated(true);
       navigate('/dashboard');
     }
   };

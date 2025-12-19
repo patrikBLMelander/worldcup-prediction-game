@@ -8,7 +8,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Entity
 @Table(
@@ -84,11 +86,55 @@ public class League {
     @Column(name = "achievements_processed")
     private Boolean achievementsProcessed = false;
 
+    /**
+     * Betting type for this league.
+     * FLAT_STAKES: Everyone pays the same entry price.
+     * CUSTOM_STAKES: Each player sets their own stake (future feature).
+     */
+    @Column(name = "betting_type", length = 20)
+    @Enumerated(EnumType.STRING)
+    private BettingType bettingType;
+
+    /**
+     * Entry price for Flat Stakes leagues.
+     * Required when bettingType is FLAT_STAKES.
+     */
+    @Column(name = "entry_price", precision = 10, scale = 2)
+    private BigDecimal entryPrice;
+
+    /**
+     * Payout structure for Flat Stakes leagues.
+     * WINNER_TAKES_ALL: 100% to 1st place.
+     * RANKED: Percentage-based distribution (see rankedPercentages).
+     */
+    @Column(name = "payout_structure", length = 20)
+    @Enumerated(EnumType.STRING)
+    private PayoutStructure payoutStructure;
+
+    /**
+     * Ranked payout percentages for Flat Stakes leagues.
+     * Stored as JSON: {"1": 0.60, "2": 0.30, "3": 0.10}
+     * Only used when payoutStructure is RANKED.
+     */
+    @Column(name = "ranked_percentages", columnDefinition = "TEXT")
+    @Convert(converter = RankedPercentagesConverter.class)
+    private Map<Integer, BigDecimal> rankedPercentages;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
         }
+    }
+
+    public enum BettingType {
+        FLAT_STAKES,
+        CUSTOM_STAKES
+    }
+
+    public enum PayoutStructure {
+        WINNER_TAKES_ALL,
+        RANKED
     }
 }
 

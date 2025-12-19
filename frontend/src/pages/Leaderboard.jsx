@@ -189,12 +189,16 @@ const Leaderboard = () => {
               <div className="player-col">Player</div>
               <div className="points-col">Points</div>
               <div className="predictions-col">Predictions</div>
+              {selectedLeague && selectedLeague.bettingType === 'FLAT_STAKES' && selectedLeague.entryPrice && (
+                <div className="prize-col">Prize</div>
+              )}
             </div>
             
             {leaderboard.map((entry, index) => {
-              const position = index + 1;
+              const position = entry.rank || index + 1;
               const isCurrentUser = entry.userId === user?.id;
               const rankIcon = getRankIcon(position);
+              const showPrize = selectedLeague && selectedLeague.bettingType === 'FLAT_STAKES' && selectedLeague.entryPrice;
               
               return (
                 <div
@@ -230,6 +234,22 @@ const Leaderboard = () => {
                   <div className="predictions-col">
                     <span className="predictions-count">{entry.predictionCount || 0}</span>
                   </div>
+                  {showPrize && (
+                    <div className="prize-col">
+                      {entry.prizeAmount && parseFloat(entry.prizeAmount) > 0 ? (
+                        <div className="prize-badge">
+                          <span className="prize-icon">💰</span>
+                          <span className="prize-amount">
+                            ${parseFloat(entry.prizeAmount).toFixed(2)}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="prize-amount zero">
+                          —
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

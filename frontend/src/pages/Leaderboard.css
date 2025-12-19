@@ -139,7 +139,7 @@
 
 .leaderboard-header-row {
   display: grid;
-  grid-template-columns: 80px 1fr 140px 140px;
+  grid-template-columns: 80px 1fr 140px 140px minmax(120px, auto);
   gap: var(--spacing-lg);
   padding: var(--spacing-lg) var(--spacing-xl);
   background: var(--surface-elevated);
@@ -151,15 +151,24 @@
   letter-spacing: 1px;
 }
 
+.leaderboard-header-row:has(.prize-col:empty),
+.leaderboard-header-row:not(:has(.prize-col)) {
+  grid-template-columns: 80px 1fr 140px 140px;
+}
+
 .leaderboard-row {
   display: grid;
-  grid-template-columns: 80px 1fr 140px 140px;
+  grid-template-columns: 80px 1fr 140px 140px minmax(120px, auto);
   gap: var(--spacing-lg);
   padding: var(--spacing-lg) var(--spacing-xl);
   border-bottom: 1px solid var(--border);
   transition: all var(--transition-base);
   align-items: center;
   position: relative;
+}
+
+.leaderboard-row:not(:has(.prize-col)) {
+  grid-template-columns: 80px 1fr 140px 140px;
 }
 
 .leaderboard-row::before {
@@ -305,6 +314,71 @@
   font-weight: 700;
 }
 
+.prize-col {
+  text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.prize-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(251, 191, 36, 0.15) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
+  transition: all var(--transition-base);
+}
+
+.rank-first .prize-badge {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(251, 191, 36, 0.25) 100%);
+  border-color: rgba(245, 158, 11, 0.5);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
+}
+
+.rank-second .prize-badge {
+  background: linear-gradient(135deg, rgba(148, 163, 184, 0.15) 0%, rgba(203, 213, 225, 0.15) 100%);
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
+.rank-third .prize-badge {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.15) 0%, rgba(251, 146, 60, 0.15) 100%);
+  border-color: rgba(249, 115, 22, 0.3);
+}
+
+.prize-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.prize-amount {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #f59e0b;
+  letter-spacing: 0.3px;
+}
+
+.rank-first .prize-amount {
+  color: #fbbf24;
+  text-shadow: 0 1px 2px rgba(245, 158, 11, 0.3);
+}
+
+.rank-second .prize-amount {
+  color: #94a3b8;
+}
+
+.rank-third .prize-amount {
+  color: #fb923c;
+}
+
+.prize-amount.zero {
+  color: var(--text-tertiary);
+  font-weight: 500;
+  font-style: italic;
+}
+
 .mobile-label {
   display: none; /* Hidden on desktop */
   font-size: 0.75rem;
@@ -432,11 +506,15 @@
 
   .leaderboard-row {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto 1fr auto auto;
     gap: var(--spacing-md);
     padding: var(--spacing-md);
     border-bottom: 1px solid var(--border);
     align-items: center;
+  }
+
+  .leaderboard-row:not(:has(.prize-col)) {
+    grid-template-columns: auto 1fr auto;
   }
 
   .leaderboard-row:hover {
@@ -503,6 +581,25 @@
 
   .predictions-col {
     display: none;
+  }
+
+  .prize-col {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  .prize-badge {
+    padding: var(--spacing-xs) var(--spacing-sm);
+    gap: 4px;
+  }
+
+  .prize-icon {
+    font-size: 1rem;
+  }
+
+  .prize-amount {
+    font-size: 0.95rem;
   }
 
   .leaderboard-stats {

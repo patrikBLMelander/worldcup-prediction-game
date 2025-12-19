@@ -31,7 +31,9 @@ function App() {
   }
 
   // Only redirect if user is authenticated AND has a screen name
-  const shouldRedirect = isAuthenticated && user?.screenName;
+  // BUT don't redirect if there's a pending league invite (let Login/Register handle it)
+  const hasPendingInvite = typeof window !== 'undefined' && localStorage.getItem('pendingLeagueInvite');
+  const shouldRedirect = isAuthenticated && user?.screenName && !hasPendingInvite;
 
   return (
     <>

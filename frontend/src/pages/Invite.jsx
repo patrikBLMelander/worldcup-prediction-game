@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import apiClient from '../config/api';
@@ -9,6 +9,7 @@ const Invite = () => {
   const { joinCode } = useParams();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  const hasProcessedRef = useRef(false);
 
   const [status, setStatus] = useState('loading'); // 'loading' | 'needs-auth' | 'joining' | 'joined' | 'error'
   const [message, setMessage] = useState('');
@@ -21,28 +22,72 @@ const Invite = () => {
       return;
     }
 
+    // Reset processing flag if joinCode changes
+    if (hasProcessedRef.current && hasProcessedRef.current.code !== code) {
+      hasProcessedRef.current = false;
+      setStatus('loading'); // Reset status when code changes
+    }
+
+    // Don't process if we've already successfully joined or are currently joining
+    if (hasProcessedRef.current && hasProcessedRef.current.code === code) {
+      // But allow retry if:
+      // 1. User just became authenticated (was needs-auth, now authenticated)
+      // 2. Previous attempt failed (status was error) and user is now authenticated
+      if (isAuthenticated && hasProcessedRef.current.status === 'needs-auth') {
+        console.log('User became authenticated, allowing retry');
+        hasProcessedRef.current = false; // Allow retry
+        setStatus('loading'); // Reset to loading state
+      } else if (hasProcessedRef.current.status === 'error' && isAuthenticated) {
+        // Allow retry if previous attempt failed and user is authenticated
+        console.log('Previous attempt failed, allowing retry for authenticated user');
+        hasProcessedRef.current = false;
+        setStatus('loading');
+      } else if (hasProcessedRef.current.status === 'joined') {
+        // Already successfully joined, don't process again
+        return;
+      } else if (hasProcessedRef.current.status === 'joining') {
+        // Currently joining, wait for it to complete
+        console.log('Already joining, waiting...');
+        return;
+      }
+    }
+
     const handleInvite = async () => {
+      console.log('handleInvite called, isAuthenticated:', isAuthenticated, 'code:', code);
+      
       if (isAuthenticated) {
         try {
           setStatus('joining');
           setMessage('Joining league...');
-          await apiClient.post('/leagues/join', { joinCode: code });
+          hasProcessedRef.current = { code, status: 'joining' };
+          console.log('Calling /leagues/join with code:', code);
+          const response = await apiClient.post('/leagues/join', { joinCode: code });
+          console.log('Join successful, response:', response.data);
           localStorage.removeItem('pendingLeagueInvite');
+          hasProcessedRef.current = { code, status: 'joined' };
           setStatus('joined');
           setMessage('You have joined the league! Redirecting to your leagues...');
           setTimeout(() => navigate('/leagues'), 1500);
         } catch (err) {
           console.error('Failed to join league from invite:', err);
+          console.error('Error details:', {
+            status: err.response?.status,
+            data: err.response?.data,
+            message: err.message
+          });
           const errorMsg =
             err.response?.data?.error ||
             err.response?.data?.message ||
             'This invite link is no longer valid or the league is locked.';
+          hasProcessedRef.current = { code, status: 'error' };
           setStatus('error');
           setMessage(errorMsg);
         }
       } else {
         // Store invite code so we can join right after login/registration
+        console.log('User not authenticated, storing code in localStorage:', code);
         localStorage.setItem('pendingLeagueInvite', code);
+        hasProcessedRef.current = { code, status: 'needs-auth' };
         setStatus('needs-auth');
         setMessage('You have been invited to join a private league.');
       }

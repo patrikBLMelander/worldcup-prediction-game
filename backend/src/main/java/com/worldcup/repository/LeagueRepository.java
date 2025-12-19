@@ -1,6 +1,7 @@
 package com.worldcup.repository;
 
 import com.worldcup.entity.League;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,6 +12,7 @@ import java.util.Optional;
 
 public interface LeagueRepository extends JpaRepository<League, Long> {
 
+    @EntityGraph(attributePaths = {"owner"})
     Optional<League> findByJoinCode(String joinCode);
     
     /**

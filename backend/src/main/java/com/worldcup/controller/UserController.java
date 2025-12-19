@@ -88,7 +88,9 @@ public class UserController {
                             user.getEmail(),
                             user.getScreenName(),
                             totalPoints,
-                            (int) predictionCount
+                            (int) predictionCount,
+                            null, // prizeAmount - not applicable for global leaderboard
+                            null  // rank - will be assigned by sorting
                     );
                 })
                 .collect(Collectors.toList());

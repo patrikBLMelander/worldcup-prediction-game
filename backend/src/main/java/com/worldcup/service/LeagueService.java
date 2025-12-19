@@ -21,8 +21,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -45,7 +49,28 @@ public class LeagueService {
             throw new IllegalArgumentException("End date must be after start date");
         }
 
-        // For now we assume validation of being within competition window is handled elsewhere or not needed
+        // Validate betting configuration
+        if (request.getBettingType() == League.BettingType.FLAT_STAKES) {
+            if (request.getEntryPrice() == null || request.getEntryPrice().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException("Entry price is required for Flat Stakes leagues");
+            }
+            if (request.getPayoutStructure() == null) {
+                // Auto-select: Winner Takes All if < 5 expected players, Ranked if >= 6
+                // For now, default to Winner Takes All (can be changed later based on member count)
+                request.setPayoutStructure(League.PayoutStructure.WINNER_TAKES_ALL);
+            }
+            if (request.getPayoutStructure() == League.PayoutStructure.RANKED) {
+                if (request.getRankedPercentages() == null || request.getRankedPercentages().isEmpty()) {
+                    throw new IllegalArgumentException("Ranked percentages are required for Ranked payout structure");
+                }
+                // Validate percentages sum to 1.0 (100%)
+                BigDecimal total = request.getRankedPercentages().values().stream()
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+                if (total.compareTo(BigDecimal.ONE) != 0) {
+                    throw new IllegalArgumentException("Ranked percentages must sum to 1.0 (100%)");
+                }
+            }
+        }
 
         League league = new League();
         league.setName(request.getName().trim());
@@ -53,6 +78,12 @@ public class LeagueService {
         league.setStartDate(request.getStartDate());
         league.setEndDate(request.getEndDate());
         league.setJoinCode(generateJoinCode());
+        
+        // Set betting fields
+        league.setBettingType(request.getBettingType());
+        league.setEntryPrice(request.getEntryPrice());
+        league.setPayoutStructure(request.getPayoutStructure());
+        league.setRankedPercentages(request.getRankedPercentages());
 
         League savedLeague = leagueRepository.save(league);
 
@@ -66,27 +97,36 @@ public class LeagueService {
         return toSummary(savedLeague);
     }
 
+    @Transactional
     public LeagueSummaryDTO joinLeagueByCode(String joinCode, User user) {
-        League league = leagueRepository.findByJoinCode(joinCode.trim())
-                .orElseThrow(() -> new IllegalArgumentException("League not found for provided code"));
+        try {
+            log.debug("Attempting to join league with code: {}, user: {}", joinCode, user.getId());
+            
+            League league = leagueRepository.findByJoinCode(joinCode.trim())
+                    .orElseThrow(() -> new IllegalArgumentException("League not found for provided code"));
 
-        LocalDateTime now = LocalDateTime.now();
-        // Disallow joining after league window has started (join deadline)
-        if (!now.isBefore(league.getStartDate())) {
-            throw new IllegalStateException("League is locked for new members");
-        }
+            log.debug("Found league: {}, startDate: {}, endDate: {}", league.getId(), league.getStartDate(), league.getEndDate());
 
-        // Ensure user is not already a member
-        Optional<LeagueMembership> existing = membershipRepository.findByLeagueAndUser(league, user);
-        if (existing.isPresent()) {
-            return toSummary(league); // Idempotent join
-        }
+            LocalDateTime now = LocalDateTime.now();
+            log.debug("Current time: {}, League start date: {}, isBefore: {}", now, league.getStartDate(), now.isBefore(league.getStartDate()));
+            
+            // Disallow joining after league window has started (join deadline)
+            if (!now.isBefore(league.getStartDate())) {
+                log.warn("User {} attempted to join league {} which has already started", user.getId(), league.getId());
+                throw new IllegalStateException("League is locked for new members");
+            }
 
-        LeagueMembership membership = new LeagueMembership();
-        membership.setLeague(league);
-        membership.setUser(user);
-        membership.setRole(LeagueRole.MEMBER);
-        membershipRepository.save(membership);
+            // Ensure user is not already a member
+            Optional<LeagueMembership> existing = membershipRepository.findByLeagueAndUser(league, user);
+            if (existing.isPresent()) {
+                return toSummary(league); // Idempotent join
+            }
+
+            LeagueMembership membership = new LeagueMembership();
+            membership.setLeague(league);
+            membership.setUser(user);
+            membership.setRole(LeagueRole.MEMBER);
+            membershipRepository.save(membership);
 
         // Notify all existing members (excluding the new member who just joined)
         if (notificationService != null) {
@@ -123,7 +163,14 @@ public class LeagueService {
             }
         }
 
-        return toSummary(league);
+            return toSummary(league);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            // Re-throw validation exceptions as-is
+            throw e;
+        } catch (Exception e) {
+            log.error("Unexpected error joining league with code {}: {}", joinCode, e.getMessage(), e);
+            throw new RuntimeException("Failed to join league: " + e.getMessage(), e);
+        }
     }
 
     @Transactional(readOnly = true)
@@ -151,12 +198,130 @@ public class LeagueService {
 
         List<LeagueMembership> memberships = membershipRepository.findByLeague(league);
 
-        return memberships.stream()
+        // Build leaderboard entries
+        List<LeaderboardEntryDTO> entries = memberships.stream()
                 .map(LeagueMembership::getUser)
                 .distinct()
                 .map(user -> buildLeagueEntryForUser(user, start, end))
                 .sorted((a, b) -> Integer.compare(b.getTotalPoints(), a.getTotalPoints()))
                 .collect(Collectors.toList());
+
+        // Assign ranks and calculate prizes for Flat Stakes leagues
+        if (league.getBettingType() == League.BettingType.FLAT_STAKES && league.getEntryPrice() != null) {
+            assignRanksAndPrizes(entries, league);
+        } else {
+            // Just assign ranks without prizes
+            for (int i = 0; i < entries.size(); i++) {
+                entries.get(i).setRank(i + 1);
+            }
+        }
+
+        return entries;
+    }
+
+    /**
+     * Assign ranks to leaderboard entries, handling ties, and calculate prize amounts for Flat Stakes leagues.
+     */
+    private void assignRanksAndPrizes(List<LeaderboardEntryDTO> entries, League league) {
+        if (entries.isEmpty()) {
+            return;
+        }
+
+        // Calculate total pot
+        int memberCount = entries.size();
+        BigDecimal totalPot = league.getEntryPrice().multiply(BigDecimal.valueOf(memberCount));
+
+        // Group entries by points to handle ties
+        Map<Integer, List<LeaderboardEntryDTO>> entriesByPoints = entries.stream()
+                .collect(Collectors.groupingBy(LeaderboardEntryDTO::getTotalPoints));
+
+        // Sort by points descending
+        List<Integer> sortedPoints = entriesByPoints.keySet().stream()
+                .sorted((a, b) -> Integer.compare(b, a))
+                .collect(Collectors.toList());
+
+        int currentRank = 1;
+        List<PrizeTier> prizeTiers = new ArrayList<>();
+
+        // Build prize tiers (handling ties)
+        for (Integer points : sortedPoints) {
+            List<LeaderboardEntryDTO> tiedEntries = entriesByPoints.get(points);
+            int tiedCount = tiedEntries.size();
+            
+            // Calculate which ranks this tier covers
+            int endRank = currentRank + tiedCount - 1;
+            
+            // Calculate prize for this tier
+            BigDecimal tierPrize = calculateTierPrize(league, currentRank, endRank, totalPot, memberCount);
+            
+            prizeTiers.add(new PrizeTier(currentRank, endRank, tierPrize, tiedEntries));
+            
+            // Assign ranks to entries
+            for (LeaderboardEntryDTO entry : tiedEntries) {
+                entry.setRank(currentRank);
+            }
+            
+            currentRank += tiedCount;
+        }
+
+        // Distribute prizes
+        for (PrizeTier tier : prizeTiers) {
+            BigDecimal prizePerPlayer = tier.prize.divide(
+                BigDecimal.valueOf(tier.entries.size()), 
+                2, 
+                RoundingMode.HALF_UP
+            );
+            for (LeaderboardEntryDTO entry : tier.entries) {
+                entry.setPrizeAmount(prizePerPlayer);
+            }
+        }
+    }
+
+    /**
+     * Calculate prize for a tier (which may span multiple ranks due to ties).
+     */
+    private BigDecimal calculateTierPrize(League league, int startRank, int endRank, BigDecimal totalPot, int memberCount) {
+        if (league.getPayoutStructure() == League.PayoutStructure.WINNER_TAKES_ALL) {
+            // Only 1st place gets prize
+            if (startRank == 1) {
+                return totalPot;
+            }
+            return BigDecimal.ZERO;
+        } else if (league.getPayoutStructure() == League.PayoutStructure.RANKED) {
+            // Sum percentages for all ranks in this tier
+            BigDecimal totalPercentage = BigDecimal.ZERO;
+            Map<Integer, BigDecimal> percentages = league.getRankedPercentages();
+            
+            if (percentages != null) {
+                for (int rank = startRank; rank <= endRank; rank++) {
+                    BigDecimal percentage = percentages.get(rank);
+                    if (percentage != null) {
+                        totalPercentage = totalPercentage.add(percentage);
+                    }
+                }
+            }
+            
+            return totalPot.multiply(totalPercentage);
+        }
+        
+        return BigDecimal.ZERO;
+    }
+
+    /**
+     * Helper class for prize tier calculation.
+     */
+    private static class PrizeTier {
+        final int startRank;
+        final int endRank;
+        final BigDecimal prize;
+        final List<LeaderboardEntryDTO> entries;
+
+        PrizeTier(int startRank, int endRank, BigDecimal prize, List<LeaderboardEntryDTO> entries) {
+            this.startRank = startRank;
+            this.endRank = endRank;
+            this.prize = prize;
+            this.entries = entries;
+        }
     }
 
     private LeaderboardEntryDTO buildLeagueEntryForUser(User user, LocalDateTime start, LocalDateTime end) {
@@ -214,7 +379,9 @@ public class LeagueService {
                 user.getEmail(),
                 user.getScreenName(),
                 totalPoints,
-                predictionCount
+                predictionCount,
+                null, // prizeAmount - will be calculated later
+                null  // rank - will be assigned later
         );
     }
 
@@ -250,17 +417,33 @@ public class LeagueService {
     }
 
     private LeagueSummaryDTO toSummary(League league) {
-        User owner = league.getOwner();
-        return new LeagueSummaryDTO(
-                league.getId(),
-                league.getName(),
-                league.getJoinCode(),
-                league.getStartDate(),
-                league.getEndDate(),
-                league.getLockedAt(),
-                owner != null ? owner.getId() : null,
-                owner != null ? owner.getScreenName() : null
-        );
+        try {
+            User owner = league.getOwner();
+            if (owner == null) {
+                log.warn("League {} has no owner", league.getId());
+            }
+            
+            LeagueSummaryDTO dto = new LeagueSummaryDTO(
+                    league.getId(),
+                    league.getName(),
+                    league.getJoinCode(),
+                    league.getStartDate(),
+                    league.getEndDate(),
+                    league.getLockedAt(),
+                    owner != null ? owner.getId() : null,
+                    owner != null ? owner.getScreenName() : null,
+                    league.getBettingType(),
+                    league.getEntryPrice(),
+                    league.getPayoutStructure(),
+                    league.getRankedPercentages()
+            );
+            
+            log.debug("Created LeagueSummaryDTO for league: {}", league.getId());
+            return dto;
+        } catch (Exception e) {
+            log.error("Error creating LeagueSummaryDTO for league {}: {}", league.getId(), e.getMessage(), e);
+            throw new RuntimeException("Failed to create league summary: " + e.getMessage(), e);
+        }
     }
 }
 

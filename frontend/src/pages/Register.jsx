@@ -23,21 +23,24 @@ const Register = () => {
   const joinPendingLeagueIfAny = useCallback(async () => {
     const code = localStorage.getItem('pendingLeagueInvite');
     if (!code) return false;
+    
+    // Wait a bit to ensure token is set in apiClient
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
     try {
       await apiClient.post('/leagues/join', { joinCode: code });
       localStorage.removeItem('pendingLeagueInvite');
       return true;
     } catch (err) {
       console.error('Failed to join league from pending invite after registration:', err);
-      localStorage.removeItem('pendingLeagueInvite');
-      setError(
-        err.response?.data?.error ||
-          err.response?.data?.message ||
-          'Failed to join league from invite.'
-      );
+      // Don't remove the code on error - redirect to invite page so user can see error and try again
+      const errorMsg = err.response?.data?.error ||
+        err.response?.data?.message ||
+        'Failed to join league from invite.';
+      setError(errorMsg);
       return false;
     }
-  }, []);
+  }, [setError]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -78,11 +81,18 @@ const Register = () => {
       } else {
         // User has screen name - join any pending invite and navigate
         const handlePostRegister = async () => {
-          const joinedFromInvite = await joinPendingLeagueIfAny();
-          setHasNavigated(true);
-          if (joinedFromInvite) {
-            navigate('/leagues');
+          const pendingCode = localStorage.getItem('pendingLeagueInvite');
+          if (pendingCode) {
+            const joinedFromInvite = await joinPendingLeagueIfAny();
+            setHasNavigated(true);
+            if (joinedFromInvite) {
+              navigate('/leagues');
+            } else {
+              // If join failed, redirect back to invite page so user can see error and try again
+              navigate(`/invite/${pendingCode}`);
+            }
           } else {
+            setHasNavigated(true);
             navigate('/dashboard');
           }
         };
@@ -94,11 +104,19 @@ const Register = () => {
   const handleScreenNameSave = async (screenName) => {
     await updateScreenName(screenName);
     setShowScreenNameModal(false);
-    const joinedFromInvite = await joinPendingLeagueIfAny();
-    setHasNavigated(true);
-    if (joinedFromInvite) {
-      navigate('/leagues');
+    
+    const pendingCode = localStorage.getItem('pendingLeagueInvite');
+    if (pendingCode) {
+      const joinedFromInvite = await joinPendingLeagueIfAny();
+      setHasNavigated(true);
+      if (joinedFromInvite) {
+        navigate('/leagues');
+      } else {
+        // If join failed, redirect back to invite page so user can see error and try again
+        navigate(`/invite/${pendingCode}`);
+      }
     } else {
+      setHasNavigated(true);
       navigate('/dashboard');
     }
   };

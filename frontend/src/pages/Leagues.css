@@ -217,6 +217,66 @@
   font-style: italic;
 }
 
+/* Toggle Group */
+.toggle-group {
+  display: flex;
+  gap: var(--spacing-xs);
+  background: var(--surface-elevated);
+  padding: var(--spacing-xs);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+}
+
+.toggle-option {
+  flex: 1;
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  position: relative;
+  font-family: var(--font-sans);
+}
+
+.toggle-option:hover:not(:disabled):not(.disabled) {
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.toggle-option.active {
+  background: linear-gradient(135deg, var(--primary-600) 0%, var(--primary-700) 100%);
+  color: white;
+  box-shadow: var(--shadow-md);
+  font-weight: 700;
+}
+
+.coming-soon-badge {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  margin-top: var(--spacing-xs);
+  color: var(--warning);
+  font-style: italic;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.toggle-option.active .coming-soon-badge {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
 /* Members Modal */
 .modal-overlay {
   position: fixed;
