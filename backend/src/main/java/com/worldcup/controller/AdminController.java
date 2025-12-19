@@ -10,7 +10,9 @@ import com.worldcup.entity.User;
 import com.worldcup.repository.UserRepository;
 import com.worldcup.security.AdminRequired;
 import com.worldcup.config.FootballApiSyncScheduler;
+import com.worldcup.entity.Notification;
 import com.worldcup.service.MatchService;
+import com.worldcup.service.NotificationService;
 import com.worldcup.service.PredictionService;
 import com.worldcup.service.WebSocketService;
 import jakarta.validation.Valid;
@@ -38,6 +40,7 @@ public class AdminController {
     private final PredictionService predictionService;
     private final WebSocketService webSocketService;
     private final FootballApiSyncScheduler footballApiSyncScheduler;
+    private final NotificationService notificationService;
 
     @GetMapping("/users")
     public ResponseEntity<List<UserInfoDTO>> getAllUsers() {
@@ -196,6 +199,39 @@ public class AdminController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(java.util.Map.of("error", "Failed to trigger sync: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/test/notification")
+    public ResponseEntity<?> testNotification(@RequestParam(required = false) Long userId) {
+        try {
+            User targetUser;
+            if (userId != null) {
+                targetUser = userRepository.findById(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+            } else {
+                // Use current user if no userId provided
+                targetUser = userRepository.findAll().stream()
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("No users found"));
+            }
+            
+            notificationService.sendNotification(
+                targetUser,
+                Notification.NotificationType.ACHIEVEMENT,
+                "Test Notification",
+                "This is a test notification to verify the notification system is working!",
+                "🧪",
+                "/profile"
+            );
+            
+            return ResponseEntity.ok().body(java.util.Map.of(
+                "message", "Test notification sent to user: " + targetUser.getEmail(),
+                "userId", targetUser.getId()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(java.util.Map.of("error", "Failed to send test notification: " + e.getMessage()));
         }
     }
 

@@ -4,6 +4,7 @@ import com.worldcup.dto.PerformanceHistoryDTO;
 import com.worldcup.dto.PredictionStatisticsDTO;
 import com.worldcup.entity.Match;
 import com.worldcup.entity.MatchStatus;
+import com.worldcup.entity.Notification;
 import com.worldcup.entity.Prediction;
 import com.worldcup.entity.User;
 import com.worldcup.repository.PredictionRepository;
@@ -27,6 +28,8 @@ public class PredictionService {
     private final MatchService matchService;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private AchievementService achievementService; // Optional - may not be available during startup
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private NotificationService notificationService; // Optional - may not be available during startup
 
     public Prediction createOrUpdatePrediction(User user, Long matchId, 
                                               Integer predictedHomeScore, 
@@ -109,6 +112,32 @@ public class PredictionService {
                 );
                 prediction.setPoints(points);
                 predictionRepository.save(prediction);
+                
+                // Send notification about match result
+                if (notificationService != null) {
+                    try {
+                        String message = String.format("%s %d - %d %s. You earned %d point%s!",
+                            match.getHomeTeam(),
+                            match.getHomeScore(),
+                            match.getAwayScore(),
+                            match.getAwayTeam(),
+                            points,
+                            points != 1 ? "s" : ""
+                        );
+                        
+                        notificationService.sendNotification(
+                            prediction.getUser(),
+                            Notification.NotificationType.MATCH_RESULT,
+                            "Match Result",
+                            message,
+                            "⚽",
+                            "/matches?tab=results"
+                        );
+                    } catch (Exception e) {
+                        log.error("Error sending match result notification for prediction {}: {}", 
+                                prediction.getId(), e.getMessage());
+                    }
+                }
                 
                 // Check achievements after points are calculated
                 if (achievementService != null) {

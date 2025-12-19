@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../config/api';
 import Navigation from '../components/Navigation';
+import { useNotifications } from '../context/NotificationContext';
 import './Leagues.css';
 
 const Leagues = () => {
   const navigate = useNavigate();
+  const { markSectionAsRead } = useNotifications();
   const [leagues, setLeagues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -35,6 +37,11 @@ const Leagues = () => {
   useEffect(() => {
     fetchLeagues();
   }, []);
+
+  // Clear any notifications that belong to the Leagues section when this page is viewed
+  useEffect(() => {
+    markSectionAsRead('/leagues');
+  }, [markSectionAsRead]);
 
   const fetchLeagues = async () => {
     try {

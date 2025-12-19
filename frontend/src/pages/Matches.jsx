@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { useWebSocket } from '../hooks/useWebSocket';
 import apiClient from '../config/api';
 import Navigation from '../components/Navigation';
@@ -10,6 +11,7 @@ import './Matches.css';
 
 const Matches = () => {
   const { user } = useAuth();
+  const { markSectionAsRead } = useNotifications();
   const [matches, setMatches] = useState([]);
   const [filteredMatches, setFilteredMatches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +34,11 @@ const Matches = () => {
     return tabParam === 'results' ? 'results' : 'upcoming';
   });
   const debounceTimers = useRef({});
+
+  // Clear any notifications that belong to the Matches section when this page is viewed
+  useEffect(() => {
+    markSectionAsRead('/matches');
+  }, [markSectionAsRead]);
 
   // Sync activeTab with URL parameter (for browser back/forward navigation)
   useEffect(() => {

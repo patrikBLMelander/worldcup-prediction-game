@@ -56,5 +56,14 @@ public class WebSocketService {
             log.info("Broadcasted match status change for match {}: {} -> {}", matchId, oldStatus, newStatus);
         });
     }
+
+    /**
+     * Send notification to specific user via WebSocket
+     * Uses Spring's user-specific messaging (automatically routes to /user/{username}/queue/notifications)
+     */
+    public void sendNotificationToUser(String username, Object notification) {
+        messagingTemplate.convertAndSendToUser(username, "/queue/notifications", notification);
+        log.debug("Sent notification to user {} via WebSocket", username);
+    }
 }
 

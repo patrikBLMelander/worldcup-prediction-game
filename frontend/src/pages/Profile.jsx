@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import apiClient from '../config/api';
 import Navigation from '../components/Navigation';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -7,6 +8,7 @@ import './Profile.css';
 
 const Profile = () => {
   const { user, updateUser } = useAuth();
+  const { markSectionAsRead } = useNotifications();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -35,6 +37,11 @@ const Profile = () => {
   // Achievements state
   const [achievements, setAchievements] = useState([]);
   const [achievementsLoading, setAchievementsLoading] = useState(true);
+
+  // Clear any notifications that belong to the Profile section when this page is viewed
+  useEffect(() => {
+    markSectionAsRead('/profile');
+  }, [markSectionAsRead]);
 
   useEffect(() => {
     if (user) {

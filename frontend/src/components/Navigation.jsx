@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { FiHome, FiCalendar, FiBarChart2, FiUser, FiSettings, FiUsers } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
+import NotificationCenter from './NotificationCenter';
+import NotificationBadge from './NotificationBadge';
 import './Navigation.css';
 
 const NAV_ITEMS = [
@@ -15,6 +18,7 @@ const NAV_ITEMS = [
 
 const Navigation = () => {
   const { user, logout, isAuthenticated } = useAuth();
+  const { unreadCount, getUnreadCountForPath, getNotificationTextForPath, markSectionAsRead } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -106,13 +110,23 @@ const Navigation = () => {
       const isActive = location.pathname === item.path;
       const linkClass = isMobile ? 'mobile-link' : 'nav-link';
       const activeClass = isActive ? 'active' : '';
-      
+      const sectionUnread = getUnreadCountForPath(item.path);
+      const showBadge = sectionUnread > 0;
+      const notificationText = getNotificationTextForPath(item.path);
+
       return (
         <Link
           key={item.path}
           to={item.path}
           className={`${linkClass} ${activeClass}`}
-          onClick={isMobile ? closeMenu : undefined}
+          onClick={(e) => {
+            if (isMobile) {
+              closeMenu();
+            }
+            // When you visit a section, clear its notifications
+            markSectionAsRead(item.path);
+          }}
+          style={{ position: 'relative' }}
         >
           {item.icon && (
             <span
@@ -121,12 +135,19 @@ const Navigation = () => {
                 display: 'inline-flex',
                 alignItems: 'center',
                 marginRight: '0.4rem',
+                position: 'relative',
               }}
             >
               <item.icon size={18} />
+              {showBadge && <NotificationBadge count={sectionUnread} />}
             </span>
           )}
           <span>{item.label}</span>
+          {isMobile && showBadge && notificationText && (
+            <span className="nav-link-subtitle">
+              {notificationText}
+            </span>
+          )}
         </Link>
       );
     });
@@ -148,6 +169,7 @@ const Navigation = () => {
           <div className="nav-desktop">
             {renderNavLinks(false)}
             <div className="nav-user-info">
+              <NotificationCenter />
               <span className="nav-username">{user?.screenName || user?.email}</span>
               <button onClick={handleLogout} className="btn-logout">
                 Logout
@@ -163,10 +185,14 @@ const Navigation = () => {
             aria-label="Toggle menu"
             aria-expanded={menuOpen}
             aria-controls="mobile-menu"
+            style={{ position: 'relative' }}
           >
             <span></span>
             <span></span>
             <span></span>
+            {unreadCount > 0 && (
+              <NotificationBadge count={unreadCount} />
+            )}
           </button>
         </div>
       </nav>

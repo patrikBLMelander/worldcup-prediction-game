@@ -14,8 +14,10 @@ import com.worldcup.entity.Prediction;
 import com.worldcup.repository.LeagueMembershipRepository;
 import com.worldcup.repository.LeagueRepository;
 import com.worldcup.repository.PredictionRepository;
+import com.worldcup.entity.Notification;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +37,8 @@ public class LeagueService {
     private final LeagueMembershipRepository membershipRepository;
     private final PredictionRepository predictionRepository;
     private final PredictionService predictionService;
+    @Autowired(required = false)
+    private NotificationService notificationService; // Optional - may not be available during startup
 
     public LeagueSummaryDTO createLeague(CreateLeagueRequest request, User owner) {
         if (request.getEndDate().isBefore(request.getStartDate())) {
@@ -83,6 +87,41 @@ public class LeagueService {
         membership.setUser(user);
         membership.setRole(LeagueRole.MEMBER);
         membershipRepository.save(membership);
+
+        // Notify all existing members (excluding the new member who just joined)
+        if (notificationService != null) {
+            try {
+                List<LeagueMembership> existingMembers = membershipRepository.findByLeague(league);
+                String newMemberName = user.getScreenName() != null && !user.getScreenName().isEmpty() 
+                    ? user.getScreenName() 
+                    : user.getEmail();
+                String message = String.format("%s joined %s", newMemberName, league.getName());
+                
+                for (LeagueMembership existingMember : existingMembers) {
+                    // Skip notifying the new member themselves
+                    if (existingMember.getUser().getId().equals(user.getId())) {
+                        continue;
+                    }
+                    
+                    try {
+                        notificationService.sendNotification(
+                            existingMember.getUser(),
+                            Notification.NotificationType.LEAGUE_MEMBER_JOINED,
+                            "New Member Joined",
+                            message,
+                            "👤",
+                            "/leagues"
+                        );
+                    } catch (Exception e) {
+                        log.error("Error sending notification to user {} about new league member: {}", 
+                                existingMember.getUser().getId(), e.getMessage());
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Error notifying league members about new join: {}", e.getMessage());
+                // Don't fail the join operation if notification fails
+            }
+        }
 
         return toSummary(league);
     }

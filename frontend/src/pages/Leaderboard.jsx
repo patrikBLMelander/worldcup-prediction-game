@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FiUsers } from 'react-icons/fi';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import apiClient from '../config/api';
 import Navigation from '../components/Navigation';
 import './Leaderboard.css';
@@ -16,6 +17,12 @@ const Leaderboard = () => {
   const [loading, setLoading] = useState(true);
   const [leaguesLoading, setLeaguesLoading] = useState(true);
   const [userPosition, setUserPosition] = useState(null);
+  const { markSectionAsRead } = useNotifications();
+
+  // Clear any notifications that belong to the Leaderboard section when this page is viewed
+  useEffect(() => {
+    markSectionAsRead('/leaderboard');
+  }, [markSectionAsRead]);
 
   // Fetch user's leagues
   useEffect(() => {

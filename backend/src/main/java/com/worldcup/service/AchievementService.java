@@ -26,6 +26,7 @@ public class AchievementService {
     private final UserAchievementRepository userAchievementRepository;
     private final PredictionRepository predictionRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
 
     /**
      * Check and award achievements after a prediction is made
@@ -281,6 +282,16 @@ public class AchievementService {
             try {
                 userAchievementRepository.save(userAchievement);
                 log.info("Achievement {} awarded to user {}", achievementCode, user.getId());
+                
+                // Send notification to user
+                notificationService.sendNotification(
+                    user,
+                    Notification.NotificationType.ACHIEVEMENT,
+                    "New Achievement Unlocked!",
+                    "You earned: " + achievement.getName(),
+                    achievement.getIcon(),
+                    "/profile#achievements"
+                );
             } catch (DataIntegrityViolationException e) {
                 // Another thread/request already awarded this achievement (race condition)
                 // This is safe to ignore - the unique constraint prevented the duplicate
