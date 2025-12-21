@@ -18,7 +18,6 @@ import com.worldcup.exception.LeagueNotFoundException;
 import com.worldcup.exception.UnauthorizedException;
 import com.worldcup.repository.LeagueMembershipRepository;
 import com.worldcup.repository.LeagueRepository;
-import com.worldcup.repository.NotificationRepository;
 import com.worldcup.repository.PredictionRepository;
 import com.worldcup.entity.Notification;
 import lombok.extern.slf4j.Slf4j;
@@ -48,7 +47,6 @@ public class LeagueService {
     private final PredictionRepository predictionRepository;
     private final PointsCalculationService pointsCalculationService;
     private final Optional<NotificationService> notificationService; // Optional - may not be available during startup
-    private final NotificationRepository notificationRepository;
 
     public LeagueSummaryDTO createLeague(CreateLeagueRequest request, User owner) {
         if (request.getEndDate().isBefore(request.getStartDate())) {
