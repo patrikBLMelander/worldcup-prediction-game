@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import apiClient from '../config/api';
 import Navigation from '../components/Navigation';
+import { formatCurrency } from '../utils/currency';
 import './Leaderboard.css';
 
 const Leaderboard = () => {
@@ -240,7 +241,7 @@ const Leaderboard = () => {
                         <div className="prize-badge">
                           <span className="prize-icon">💰</span>
                           <span className="prize-amount">
-                            ${parseFloat(entry.prizeAmount).toFixed(2)}
+                            {formatCurrency(entry.prizeAmount)}
                           </span>
                         </div>
                       ) : (

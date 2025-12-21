@@ -55,8 +55,14 @@ public class GlobalExceptionHandler {
         log.warn("Business exception: {} - {} at {}", 
                 ex.getErrorCode(), ex.getMessage(), request.getRequestURI());
         
+        // UnauthorizedException should return 403 FORBIDDEN, not 400 BAD_REQUEST
+        // Use instanceof for type safety instead of string comparison
+        HttpStatus status = ex instanceof UnauthorizedException
+                ? HttpStatus.FORBIDDEN 
+                : HttpStatus.BAD_REQUEST;
+        
         return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
+                .status(status)
                 .body(new ErrorResponse(
                         ex.getErrorCode(),
                         ex.getMessage(),

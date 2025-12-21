@@ -57,6 +57,17 @@ public class LeagueController {
         List<LeagueMemberDTO> members = leagueService.getLeagueMembers(leagueId);
         return ResponseEntity.ok(members);
     }
+
+    // TODO: League deletion feature - temporarily disabled for production safety
+    // Will be enabled after fixing notification cleanup pattern mismatch
+    /*
+    @DeleteMapping("/{leagueId}")
+    public ResponseEntity<?> deleteLeague(@PathVariable Long leagueId) {
+        User user = currentUser.getCurrentUserOrThrow();
+        leagueService.deleteLeague(leagueId, user);
+        return ResponseEntity.ok().body(java.util.Map.of("message", "League deleted successfully"));
+    }
+    */
 }
 
 

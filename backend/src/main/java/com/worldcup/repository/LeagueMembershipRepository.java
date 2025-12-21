@@ -17,6 +17,8 @@ public interface LeagueMembershipRepository extends JpaRepository<LeagueMembersh
 
     @EntityGraph(attributePaths = {"user"})
     List<LeagueMembership> findByLeague(League league);
+
+    void deleteByLeague(League league);
 }
 
 

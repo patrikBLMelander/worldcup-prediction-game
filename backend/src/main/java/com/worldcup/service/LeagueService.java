@@ -15,12 +15,15 @@ import com.worldcup.exception.InvalidBettingConfigurationException;
 import com.worldcup.exception.InvalidDateRangeException;
 import com.worldcup.exception.LeagueLockedException;
 import com.worldcup.exception.LeagueNotFoundException;
+import com.worldcup.exception.UnauthorizedException;
 import com.worldcup.repository.LeagueMembershipRepository;
 import com.worldcup.repository.LeagueRepository;
+import com.worldcup.repository.NotificationRepository;
 import com.worldcup.repository.PredictionRepository;
 import com.worldcup.entity.Notification;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +48,8 @@ public class LeagueService {
     private final PredictionRepository predictionRepository;
     private final PointsCalculationService pointsCalculationService;
     private final Optional<NotificationService> notificationService; // Optional - may not be available during startup
+    // TODO: Temporarily disabled - only used by deleteLeague feature
+    // private final NotificationRepository notificationRepository;
 
     public LeagueSummaryDTO createLeague(CreateLeagueRequest request, User owner) {
         if (request.getEndDate().isBefore(request.getStartDate())) {
@@ -124,16 +129,26 @@ public class LeagueService {
                 return toSummary(league); // Idempotent join
             }
 
+            // Fetch existing members BEFORE saving new membership (for notifications)
+            List<LeagueMembership> existingMembers = membershipRepository.findByLeague(league);
+
             LeagueMembership membership = new LeagueMembership();
             membership.setLeague(league);
             membership.setUser(user);
             membership.setRole(LeagueRole.MEMBER);
-            membershipRepository.save(membership);
+            
+            // Handle race condition: if another thread already added this membership, catch the constraint violation
+            try {
+                membershipRepository.save(membership);
+            } catch (DataIntegrityViolationException e) {
+                // Another thread already added this membership - that's okay, return idempotently
+                log.debug("User {} already a member of league {} (race condition handled)", user.getId(), league.getId());
+                return toSummary(league);
+            }
 
         // Notify all existing members (excluding the new member who just joined)
         notificationService.ifPresent(service -> {
             try {
-                List<LeagueMembership> existingMembers = membershipRepository.findByLeague(league);
                 String newMemberName = user.getScreenName() != null && !user.getScreenName().isEmpty() 
                     ? user.getScreenName() 
                     : user.getEmail();
@@ -185,9 +200,27 @@ public class LeagueService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Generates a unique join code for a league.
+     * Retries up to 10 times if a collision occurs (unlikely but possible with 8-character codes).
+     * 
+     * @return a unique 8-character uppercase code
+     * @throws RuntimeException if unable to generate a unique code after max attempts
+     */
     private String generateJoinCode() {
-        // Simple random uppercase code; uniqueness is enforced by DB constraint
-        return UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+        int maxAttempts = 10;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            String code = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+            
+            // Check if code already exists (unlikely but possible)
+            if (!leagueRepository.findByJoinCode(code).isPresent()) {
+                return code;
+            }
+            
+            log.warn("Join code collision detected on attempt {}: {}", attempt, code);
+        }
+        
+        throw new RuntimeException("Failed to generate unique join code after " + maxAttempts + " attempts");
     }
 
     @Transactional(readOnly = true)
@@ -226,6 +259,16 @@ public class LeagueService {
      */
     private void assignRanksAndPrizes(List<LeaderboardEntryDTO> entries, League league) {
         if (entries.isEmpty()) {
+            return;
+        }
+
+        // Safety check: ensure entryPrice is not null
+        if (league.getEntryPrice() == null) {
+            log.warn("League {} has FLAT_STAKES but null entryPrice, skipping prize calculation", league.getId());
+            // Just assign ranks without prizes
+            for (int i = 0; i < entries.size(); i++) {
+                entries.get(i).setRank(i + 1);
+            }
             return;
         }
 
@@ -268,6 +311,12 @@ public class LeagueService {
 
         // Distribute prizes
         for (PrizeTier tier : prizeTiers) {
+            // Defensive check: skip empty tiers
+            if (tier.entries.isEmpty()) {
+                log.warn("Empty prize tier detected for league {}, skipping", league.getId());
+                continue;
+            }
+            
             BigDecimal prizePerPlayer = tier.prize.divide(
                 BigDecimal.valueOf(tier.entries.size()), 
                 2, 
@@ -447,6 +496,61 @@ public class LeagueService {
             throw new RuntimeException("Failed to create league summary: " + e.getMessage(), e);
         }
     }
+
+    /**
+     * Deletes a league. Only the owner can delete their league.
+     * This will delete all league memberships and clean up related notifications.
+     * 
+     * TODO: Temporarily disabled for production safety - will be enabled after fixing notification cleanup
+     * 
+     * @param leagueId the ID of the league to delete
+     * @param user the user attempting to delete the league
+     * @throws LeagueNotFoundException if the league doesn't exist
+     * @throws UnauthorizedException if the user is not the owner of the league
+     * @throws LeagueLockedException if the league has already started
+     */
+    /*
+    @Transactional
+    public void deleteLeague(Long leagueId, User user) {
+        League league = leagueRepository.findById(leagueId)
+                .orElseThrow(() -> new LeagueNotFoundException(leagueId));
+
+        // Only the owner can delete the league
+        if (league.getOwner() == null || !league.getOwner().getId().equals(user.getId())) {
+            throw new UnauthorizedException("Only the league owner can delete the league");
+        }
+
+        // Prevent deletion of leagues that have already started
+        LocalDateTime now = LocalDateTime.now();
+        if (league.getStartDate().isBefore(now) || league.getStartDate().equals(now)) {
+            throw new LeagueLockedException("Cannot delete a league that has already started");
+        }
+
+        log.info("Deleting league {} by user {}", leagueId, user.getId());
+
+        // Delete all memberships explicitly (no cascade configured in entity)
+        membershipRepository.deleteByLeague(league);
+
+        // Clean up notifications related to this league
+        // Use try-catch to ensure notification cleanup failure doesn't prevent league deletion
+        // Note: This cleanup is best-effort; transaction will commit even if cleanup fails
+        try {
+            // Match notifications with linkUrl containing /leagues?league={id}
+            // This pattern matches both /leagues?league={id} and /leagues?league={id}&other=params
+            String leagueLinkPattern = "%/leagues?league=" + leagueId + "%";
+            int deletedCount = notificationRepository.deleteByLinkUrlContaining(leagueLinkPattern);
+            log.debug("Deleted {} notifications related to league {}", deletedCount, leagueId);
+        } catch (Exception e) {
+            log.warn("Failed to clean up notifications for league {}: {}", leagueId, e.getMessage());
+            // Continue with deletion even if notification cleanup fails
+        }
+
+        // Delete the league
+        leagueRepository.delete(league);
+
+        log.info("Successfully deleted league {}", leagueId);
+    }
+    */
 }
 
 

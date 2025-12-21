@@ -16,6 +16,14 @@ public interface LeagueRepository extends JpaRepository<League, Long> {
     Optional<League> findByJoinCode(String joinCode);
     
     /**
+     * Find league by ID with owner eagerly fetched.
+     * Used to avoid LazyInitializationException when accessing owner.
+     */
+    @EntityGraph(attributePaths = {"owner"})
+    @Override
+    Optional<League> findById(Long id);
+    
+    /**
      * Find all leagues that have finished (endDate <= now)
      */
     @Query("SELECT l FROM League l WHERE l.endDate <= :now")

@@ -3,11 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import apiClient from '../config/api';
 import Navigation from '../components/Navigation';
 import { useNotifications } from '../context/NotificationContext';
+import { useAuth } from '../context/AuthContext';
+import { formatCurrency } from '../utils/currency';
 import './Leagues.css';
 
 const Leagues = () => {
   const navigate = useNavigate();
   const { markSectionAsRead } = useNotifications();
+  const { user } = useAuth();
   const [leagues, setLeagues] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -37,6 +40,8 @@ const Leagues = () => {
   // Invite modal state
   const [inviteLeagueId, setInviteLeagueId] = useState(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  // TODO: Delete feature temporarily disabled for production safety
+  // const [deletingLeagueId, setDeletingLeagueId] = useState(null);
 
   useEffect(() => {
     fetchLeagues();
@@ -72,7 +77,7 @@ const Leagues = () => {
       if (createFormData.bettingType === 'FLAT_STAKES') {
         // Validate entry price
         if (!createFormData.entryPrice || parseFloat(createFormData.entryPrice) <= 0) {
-          setError('Entry price is required and must be greater than $0.00');
+          setError('Entry price is required and must be greater than 0 SEK');
           setCreateLoading(false);
           return;
         }
@@ -89,10 +94,29 @@ const Leagues = () => {
         }
       }
 
+      // Validate dates
+      if (!createFormData.startDate || !createFormData.endDate) {
+        setError('Both start and end dates are required');
+        setCreateLoading(false);
+        return;
+      }
+
+      // Validate that end date is after or equal to start date (compare dates only, ignore time)
+      // Same-day leagues are allowed (start and end on the same day)
+      if (new Date(createFormData.endDate) < new Date(createFormData.startDate)) {
+        setError('End date must be on or after start date');
+        setCreateLoading(false);
+        return;
+      }
+
+      // Convert date-only inputs to datetime format with 00:00:00 (midnight, explicit seconds)
+      const startDateTime = `${createFormData.startDate}T00:00:00`;
+      const endDateTime = `${createFormData.endDate}T00:00:00`;
+
       const payload = {
         name: createFormData.name.trim(),
-        startDate: createFormData.startDate,
-        endDate: createFormData.endDate,
+        startDate: startDateTime,
+        endDate: endDateTime,
         bettingType: createFormData.bettingType
       };
 
@@ -144,7 +168,7 @@ const Leagues = () => {
       
       // Add betting info to success message
       if (league.bettingType === 'FLAT_STAKES' && league.entryPrice) {
-        successMsg += ` Entry price: $${parseFloat(league.entryPrice).toFixed(2)}`;
+        successMsg += ` Entry price: ${formatCurrency(league.entryPrice)}`;
         if (league.payoutStructure === 'WINNER_TAKES_ALL') {
           successMsg += ' (Winner Takes All)';
         } else if (league.payoutStructure === 'RANKED') {
@@ -222,6 +246,35 @@ const Leagues = () => {
     return `${origin}/invite/${league.joinCode}`;
   };
 
+  // TODO: League deletion feature - temporarily disabled for production safety
+  /*
+  const handleDeleteLeague = async (leagueId) => {
+    if (!window.confirm('Are you sure you want to delete this league? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setError('');
+      setSuccess('');
+      setDeletingLeagueId(leagueId);
+      await apiClient.delete(`/leagues/${leagueId}`);
+      setSuccess('League deleted successfully');
+      // Refresh the leagues list
+      await fetchLeagues();
+    } catch (err) {
+      setError(err.response?.data?.error || err.response?.data?.message || 'Failed to delete league');
+      setSuccess('');
+      console.error('Failed to delete league:', err);
+    } finally {
+      setDeletingLeagueId(null);
+    }
+  };
+  */
+
+  const isOwner = (league) => {
+    return user && league.ownerId && user.id === league.ownerId;
+  };
+
   if (loading) {
     return (
       <div className="profile-container">
@@ -291,7 +344,7 @@ const Leagues = () => {
               <div className="form-group">
                 <label htmlFor="startDate">Start Date</label>
                 <input
-                  type="datetime-local"
+                  type="date"
                   id="startDate"
                   value={createFormData.startDate}
                   onChange={(e) => setCreateFormData({ ...createFormData, startDate: e.target.value })}
@@ -302,7 +355,7 @@ const Leagues = () => {
               <div className="form-group">
                 <label htmlFor="endDate">End Date</label>
                 <input
-                  type="datetime-local"
+                  type="date"
                   id="endDate"
                   value={createFormData.endDate}
                   onChange={(e) => setCreateFormData({ ...createFormData, endDate: e.target.value })}
@@ -344,7 +397,7 @@ const Leagues = () => {
 
               {/* Entry Price (always shown - admin is part of league) */}
               <div className="form-group">
-                <label htmlFor="entryPrice">Entry Price ($)</label>
+                <label htmlFor="entryPrice">Entry Price (SEK)</label>
                 <input
                   type="number"
                   id="entryPrice"
@@ -547,7 +600,7 @@ const Leagues = () => {
                           <div className="league-info-item">
                             <span className="league-info-label">Entry Price:</span>
                             <span className="league-info-value" style={{ color: 'var(--primary-500)', fontWeight: 600 }}>
-                              ${parseFloat(league.entryPrice).toFixed(2)}
+                              {formatCurrency(league.entryPrice)}
                             </span>
                           </div>
                           <div className="league-info-item">
@@ -583,6 +636,17 @@ const Leagues = () => {
                         >
                           View Leaderboard
                         </button>
+                        {/* TODO: League deletion feature - temporarily disabled for production safety */}
+                        {/* {isOwner(league) && (
+                          <button
+                            onClick={() => handleDeleteLeague(league.id)}
+                            className="btn-danger btn-small"
+                            disabled={deletingLeagueId === league.id}
+                            style={{ marginLeft: 'auto' }}
+                          >
+                            {deletingLeagueId === league.id ? '⏳ Deleting...' : '🗑️ Delete'}
+                          </button>
+                        )} */}
                       </div>
                     </div>
                   </div>

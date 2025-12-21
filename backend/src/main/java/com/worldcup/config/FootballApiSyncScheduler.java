@@ -105,7 +105,7 @@ public class FootballApiSyncScheduler {
      * Sync live scores - runs every 60 seconds during match days
      * Fetches matches that are currently live
      */
-    @Scheduled(fixedRate = 60000) // Every 60 seconds to reduce memory pressure
+    @Scheduled(fixedRate = 60000) // Every 60 seconds
     @Transactional
     public void syncLiveScores() {
         if (!apiEnabled) {
