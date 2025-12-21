@@ -1,6 +1,8 @@
 package com.worldcup.service;
 
 import com.worldcup.entity.User;
+import com.worldcup.exception.EmailAlreadyExistsException;
+import com.worldcup.exception.InvalidPasswordException;
 import com.worldcup.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,7 +21,7 @@ public class UserService {
 
     public User createUser(String email, String password) {
         if (userRepository.existsByEmail(email)) {
-            throw new IllegalArgumentException("Email already exists");
+            throw new EmailAlreadyExistsException(email);
         }
 
         User user = new User();
@@ -45,7 +47,7 @@ public class UserService {
     public void changePassword(User user, String currentPassword, String newPassword) {
         // Verify current password
         if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
-            throw new IllegalArgumentException("Current password is incorrect");
+            throw new InvalidPasswordException("Current password is incorrect");
         }
 
         // Update password

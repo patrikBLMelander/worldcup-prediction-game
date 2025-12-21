@@ -15,6 +15,7 @@ import com.worldcup.entity.Prediction;
 import com.worldcup.entity.User;
 import com.worldcup.entity.Achievement;
 import com.worldcup.entity.UserAchievement;
+import com.worldcup.exception.UserNotFoundException;
 import com.worldcup.repository.AchievementRepository;
 import com.worldcup.repository.MatchRepository;
 import com.worldcup.repository.PredictionRepository;
@@ -79,7 +80,7 @@ public class UserController {
                     Integer totalPoints = ((Number) row[1]).intValue();
                     
                     User user = userRepository.findById(userId)
-                            .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                            .orElseThrow(() -> new UserNotFoundException(userId));
                     
                     long predictionCount = predictionRepository.findByUser(user).size();
                     
@@ -191,7 +192,7 @@ public class UserController {
     @GetMapping("/{userId}/public-profile")
     public ResponseEntity<PublicProfileDTO> getPublicProfile(@PathVariable Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException(userId));
         
         Integer totalPoints = predictionService.calculateTotalPoints(user);
         long predictionCount = predictionRepository.findByUser(user).size();
@@ -343,7 +344,7 @@ public class UserController {
     @GetMapping("/{userId}/achievements")
     public ResponseEntity<List<AchievementDTO>> getUserAchievements(@PathVariable Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException(userId));
         
         // Get all available achievements
         List<Achievement> allAchievements = achievementRepository.findByActiveTrueOrderByCategoryAscRarityDesc();

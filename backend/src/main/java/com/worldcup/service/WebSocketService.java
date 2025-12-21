@@ -20,19 +20,19 @@ public class WebSocketService {
      * Convert Match entity to MatchDTO
      */
     private MatchDTO convertToDTO(Match match) {
-        MatchDTO dto = new MatchDTO();
-        dto.setId(match.getId());
-        dto.setHomeTeam(match.getHomeTeam());
-        dto.setHomeTeamCrest(match.getHomeTeamCrest());
-        dto.setAwayTeam(match.getAwayTeam());
-        dto.setAwayTeamCrest(match.getAwayTeamCrest());
-        dto.setMatchDate(match.getMatchDate());
-        dto.setVenue(match.getVenue());
-        dto.setGroup(match.getGroup());
-        dto.setStatus(match.getStatus());
-        dto.setHomeScore(match.getHomeScore());
-        dto.setAwayScore(match.getAwayScore());
-        return dto;
+        return new MatchDTO(
+            match.getId(),
+            match.getHomeTeam(),
+            match.getHomeTeamCrest(),
+            match.getAwayTeam(),
+            match.getAwayTeamCrest(),
+            match.getMatchDate(),
+            match.getVenue(),
+            match.getGroup(),
+            match.getStatus(),
+            match.getHomeScore(),
+            match.getAwayScore()
+        );
     }
 
     /**

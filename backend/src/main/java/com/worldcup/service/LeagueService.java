@@ -11,6 +11,10 @@ import com.worldcup.entity.User;
 import com.worldcup.entity.Match;
 import com.worldcup.entity.MatchStatus;
 import com.worldcup.entity.Prediction;
+import com.worldcup.exception.InvalidBettingConfigurationException;
+import com.worldcup.exception.InvalidDateRangeException;
+import com.worldcup.exception.LeagueLockedException;
+import com.worldcup.exception.LeagueNotFoundException;
 import com.worldcup.repository.LeagueMembershipRepository;
 import com.worldcup.repository.LeagueRepository;
 import com.worldcup.repository.PredictionRepository;
@@ -46,13 +50,13 @@ public class LeagueService {
 
     public LeagueSummaryDTO createLeague(CreateLeagueRequest request, User owner) {
         if (request.getEndDate().isBefore(request.getStartDate())) {
-            throw new IllegalArgumentException("End date must be after start date");
+            throw new InvalidDateRangeException(request.getStartDate(), request.getEndDate());
         }
 
         // Validate betting configuration
         if (request.getBettingType() == League.BettingType.FLAT_STAKES) {
             if (request.getEntryPrice() == null || request.getEntryPrice().compareTo(BigDecimal.ZERO) <= 0) {
-                throw new IllegalArgumentException("Entry price is required for Flat Stakes leagues");
+                throw new InvalidBettingConfigurationException("Entry price is required for Flat Stakes leagues");
             }
             if (request.getPayoutStructure() == null) {
                 // Auto-select: Winner Takes All if < 5 expected players, Ranked if >= 6
@@ -61,13 +65,13 @@ public class LeagueService {
             }
             if (request.getPayoutStructure() == League.PayoutStructure.RANKED) {
                 if (request.getRankedPercentages() == null || request.getRankedPercentages().isEmpty()) {
-                    throw new IllegalArgumentException("Ranked percentages are required for Ranked payout structure");
+                    throw new InvalidBettingConfigurationException("Ranked percentages are required for Ranked payout structure");
                 }
                 // Validate percentages sum to 1.0 (100%)
                 BigDecimal total = request.getRankedPercentages().values().stream()
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
                 if (total.compareTo(BigDecimal.ONE) != 0) {
-                    throw new IllegalArgumentException("Ranked percentages must sum to 1.0 (100%)");
+                    throw new InvalidBettingConfigurationException("Ranked percentages must sum to 1.0 (100%)");
                 }
             }
         }
@@ -103,7 +107,7 @@ public class LeagueService {
             log.debug("Attempting to join league with code: {}, user: {}", joinCode, user.getId());
             
             League league = leagueRepository.findByJoinCode(joinCode.trim())
-                    .orElseThrow(() -> new IllegalArgumentException("League not found for provided code"));
+                    .orElseThrow(() -> new LeagueNotFoundException(joinCode));
 
             log.debug("Found league: {}, startDate: {}, endDate: {}", league.getId(), league.getStartDate(), league.getEndDate());
 
@@ -113,7 +117,7 @@ public class LeagueService {
             // Disallow joining after league window has started (join deadline)
             if (!now.isBefore(league.getStartDate())) {
                 log.warn("User {} attempted to join league {} which has already started", user.getId(), league.getId());
-                throw new IllegalStateException("League is locked for new members");
+                throw new LeagueLockedException(league.getId());
             }
 
             // Ensure user is not already a member
@@ -191,7 +195,7 @@ public class LeagueService {
     @Transactional(readOnly = true)
     public List<LeaderboardEntryDTO> getLeagueLeaderboard(Long leagueId) {
         League league = leagueRepository.findById(leagueId)
-                .orElseThrow(() -> new IllegalArgumentException("League not found"));
+                .orElseThrow(() -> new LeagueNotFoundException(leagueId));
 
         LocalDateTime start = league.getStartDate();
         LocalDateTime end = league.getEndDate();
@@ -388,7 +392,7 @@ public class LeagueService {
     @Transactional(readOnly = true)
     public List<LeagueMemberDTO> getLeagueMembers(Long leagueId) {
         League league = leagueRepository.findById(leagueId)
-                .orElseThrow(() -> new IllegalArgumentException("League not found"));
+                .orElseThrow(() -> new LeagueNotFoundException(leagueId));
 
         List<LeagueMembership> memberships = membershipRepository.findByLeague(league);
         

@@ -2,6 +2,7 @@ package com.worldcup.service;
 
 import com.worldcup.entity.Match;
 import com.worldcup.entity.MatchStatus;
+import com.worldcup.exception.MatchNotFoundException;
 import com.worldcup.repository.MatchRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -49,7 +50,7 @@ public class MatchService {
 
     public Match updateMatchResult(Long matchId, Integer homeScore, Integer awayScore) {
         Match match = matchRepository.findById(matchId)
-            .orElseThrow(() -> new IllegalArgumentException("Match not found"));
+            .orElseThrow(() -> new MatchNotFoundException(matchId));
 
         match.setHomeScore(homeScore);
         match.setAwayScore(awayScore);
@@ -60,7 +61,7 @@ public class MatchService {
 
     public Match updateMatchStatus(Long matchId, MatchStatus status) {
         Match match = matchRepository.findById(matchId)
-            .orElseThrow(() -> new IllegalArgumentException("Match not found"));
+            .orElseThrow(() -> new MatchNotFoundException(matchId));
 
         match.setStatus(status);
         return matchRepository.save(match);
@@ -68,7 +69,7 @@ public class MatchService {
 
     public void deleteMatch(Long matchId) {
         Match match = matchRepository.findById(matchId)
-            .orElseThrow(() -> new IllegalArgumentException("Match not found"));
+            .orElseThrow(() -> new MatchNotFoundException(matchId));
         matchRepository.delete(match);
     }
 }

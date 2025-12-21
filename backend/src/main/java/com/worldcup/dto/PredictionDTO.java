@@ -1,25 +1,22 @@
 package com.worldcup.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import java.time.LocalDateTime;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class PredictionDTO {
-    private Long id;
-    private Long matchId;
-    private String homeTeam;
-    private String awayTeam;
-    private LocalDateTime matchDate;
-    private Integer predictedHomeScore;
-    private Integer predictedAwayScore;
-    private Integer points;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-}
+/**
+ * Data Transfer Object for Prediction information.
+ * Immutable record representing a user's prediction for a match.
+ */
+public record PredictionDTO(
+    Long id,
+    Long matchId,
+    String homeTeam,
+    String awayTeam,
+    LocalDateTime matchDate,
+    Integer predictedHomeScore,
+    Integer predictedAwayScore,
+    Integer points,
+    LocalDateTime createdAt,
+    LocalDateTime updatedAt
+) {}
 
 

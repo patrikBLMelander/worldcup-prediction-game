@@ -7,6 +7,10 @@ import com.worldcup.entity.MatchStatus;
 import com.worldcup.entity.Notification;
 import com.worldcup.entity.Prediction;
 import com.worldcup.entity.User;
+import com.worldcup.exception.InvalidMatchStateException;
+import com.worldcup.exception.MatchNotFoundException;
+import com.worldcup.exception.MatchResultNotAvailableException;
+import com.worldcup.exception.PredictionLockedException;
 import com.worldcup.repository.PredictionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -35,13 +39,13 @@ public class PredictionService {
                                               Integer predictedHomeScore, 
                                               Integer predictedAwayScore) {
         Match match = matchService.findById(matchId)
-            .orElseThrow(() -> new IllegalArgumentException("Match not found"));
+            .orElseThrow(() -> new MatchNotFoundException(matchId));
 
         // Check if match is still open for predictions
         // Predictions are allowed only when match status is SCHEDULED
         // Once status changes to LIVE or FINISHED, predictions are locked
         if (match.getStatus() != com.worldcup.entity.MatchStatus.SCHEDULED) {
-            throw new IllegalStateException("Cannot make predictions for matches that are not scheduled. Match status: " + match.getStatus());
+            throw new PredictionLockedException(match.getStatus());
         }
 
         Optional<Prediction> existingPrediction = predictionRepository.findByUserAndMatch(user, match);
@@ -64,7 +68,7 @@ public class PredictionService {
 
     public Optional<Prediction> findByUserAndMatch(User user, Long matchId) {
         Match match = matchService.findById(matchId)
-            .orElseThrow(() -> new IllegalArgumentException("Match not found"));
+            .orElseThrow(() -> new MatchNotFoundException(matchId));
         return predictionRepository.findByUserAndMatch(user, match);
     }
 
@@ -74,7 +78,7 @@ public class PredictionService {
 
     public List<Prediction> findByMatch(Long matchId) {
         Match match = matchService.findById(matchId)
-            .orElseThrow(() -> new IllegalArgumentException("Match not found"));
+            .orElseThrow(() -> new MatchNotFoundException(matchId));
         return predictionRepository.findByMatch(match);
     }
 
@@ -84,15 +88,15 @@ public class PredictionService {
 
     public void calculatePointsForMatch(Long matchId) {
         Match match = matchService.findById(matchId)
-            .orElseThrow(() -> new IllegalArgumentException("Match not found"));
+            .orElseThrow(() -> new MatchNotFoundException(matchId));
 
         if (match.getHomeScore() == null || match.getAwayScore() == null) {
-            throw new IllegalStateException("Match result not available");
+            throw new MatchResultNotAvailableException(matchId);
         }
 
         // Only calculate points for FINISHED matches
         if (match.getStatus() != MatchStatus.FINISHED) {
-            throw new IllegalStateException("Points can only be calculated for FINISHED matches. Current status: " + match.getStatus());
+            throw new InvalidMatchStateException(match.getStatus(), "calculate points");
         }
 
         List<Prediction> predictions = predictionRepository.findByMatch(match);

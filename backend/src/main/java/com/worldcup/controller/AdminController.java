@@ -7,6 +7,10 @@ import com.worldcup.entity.Match;
 import com.worldcup.entity.MatchStatus;
 import com.worldcup.entity.Role;
 import com.worldcup.entity.User;
+import com.worldcup.exception.InvalidMatchStateException;
+import com.worldcup.exception.MatchNotFoundException;
+import com.worldcup.exception.MatchResultNotAvailableException;
+import com.worldcup.exception.UserNotFoundException;
 import com.worldcup.repository.UserRepository;
 import com.worldcup.security.AdminRequired;
 import com.worldcup.config.FootballApiSyncScheduler;
@@ -62,7 +66,7 @@ public class AdminController {
     @Transactional
     public ResponseEntity<?> updateUserRole(@PathVariable Long id, @RequestParam String role) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException(id));
         
         try {
             user.setRole(Role.valueOf(role.toUpperCase()));
@@ -77,7 +81,7 @@ public class AdminController {
     @Transactional
     public ResponseEntity<?> updateUserEnabled(@PathVariable Long id, @RequestParam Boolean enabled) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                .orElseThrow(() -> new UserNotFoundException(id));
         
         user.setEnabled(enabled);
         userRepository.save(user);
@@ -152,7 +156,7 @@ public class AdminController {
             
             log.info("Successfully updated match result for match {}", id);
             return ResponseEntity.ok(matchDTO);
-        } catch (IllegalArgumentException e) {
+        } catch (MatchNotFoundException e) {
             log.error("Match not found: {}", id, e);
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -186,7 +190,7 @@ public class AdminController {
     @Transactional
     public ResponseEntity<?> deleteMatch(@PathVariable Long id) {
         matchService.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Match not found"));
+                .orElseThrow(() -> new MatchNotFoundException(id));
         matchService.deleteMatch(id);
         return ResponseEntity.ok().body(java.util.Map.of("message", "Match deleted successfully"));
     }
@@ -207,7 +211,7 @@ public class AdminController {
     public ResponseEntity<?> recalculatePointsForMatch(@PathVariable Long id) {
         try {
             Match match = matchService.findById(id)
-                    .orElseThrow(() -> new IllegalArgumentException("Match not found"));
+                    .orElseThrow(() -> new MatchNotFoundException(id));
             
             if (match.getStatus() != MatchStatus.FINISHED) {
                 return ResponseEntity.badRequest().body(java.util.Map.of(
@@ -231,10 +235,10 @@ public class AdminController {
                 "match", match.getHomeTeam() + " vs " + match.getAwayTeam(),
                 "score", match.getHomeScore() + " - " + match.getAwayScore()
             ));
-        } catch (IllegalArgumentException e) {
+        } catch (MatchNotFoundException e) {
             log.error("Match not found: {}", id, e);
             return ResponseEntity.notFound().build();
-        } catch (IllegalStateException e) {
+        } catch (MatchResultNotAvailableException | InvalidMatchStateException e) {
             log.error("Cannot recalculate points: {}", e.getMessage());
             return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage()));
         } catch (Exception e) {
@@ -295,7 +299,7 @@ public class AdminController {
             User targetUser;
             if (userId != null) {
                 targetUser = userRepository.findById(userId)
-                    .orElseThrow(() -> new IllegalArgumentException("User not found"));
+                    .orElseThrow(() -> new UserNotFoundException(userId));
             } else {
                 // Use current user if no userId provided
                 targetUser = userRepository.findAll().stream()

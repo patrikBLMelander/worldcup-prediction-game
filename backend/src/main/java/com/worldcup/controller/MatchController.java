@@ -5,6 +5,7 @@ import com.worldcup.dto.MatchDTO;
 import com.worldcup.dto.UpdateMatchResultRequest;
 import com.worldcup.entity.Match;
 import com.worldcup.entity.MatchStatus;
+import com.worldcup.exception.MatchNotFoundException;
 import com.worldcup.security.AdminRequired;
 import com.worldcup.service.MatchService;
 import com.worldcup.service.PredictionService;
@@ -55,7 +56,7 @@ public class MatchController {
     @GetMapping("/{id}")
     public ResponseEntity<MatchDTO> getMatchById(@PathVariable Long id) {
         Match match = matchService.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Match not found"));
+                .orElseThrow(() -> new MatchNotFoundException(id));
 
         return ResponseEntity.ok(convertToDTO(match));
     }
