@@ -24,9 +24,10 @@ public interface LeagueRepository extends JpaRepository<League, Long> {
     Optional<League> findById(Long id);
     
     /**
-     * Find all leagues that have finished (endDate <= now)
+     * Find all leagues that have finished (endDate <= now) and are not hidden.
+     * Used for processing achievements and other post-league operations.
      */
-    @Query("SELECT l FROM League l WHERE l.endDate <= :now")
+    @Query("SELECT l FROM League l WHERE l.endDate <= :now AND (l.hidden IS NULL OR l.hidden = false)")
     List<League> findFinishedLeagues(@Param("now") LocalDateTime now);
 }
 

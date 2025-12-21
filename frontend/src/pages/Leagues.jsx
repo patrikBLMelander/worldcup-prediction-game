@@ -40,8 +40,8 @@ const Leagues = () => {
   // Invite modal state
   const [inviteLeagueId, setInviteLeagueId] = useState(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  // TODO: Delete feature temporarily disabled for production safety
-  // const [deletingLeagueId, setDeletingLeagueId] = useState(null);
+  // Delete loading state
+  const [deletingLeagueId, setDeletingLeagueId] = useState(null);
 
   useEffect(() => {
     fetchLeagues();
@@ -246,10 +246,8 @@ const Leagues = () => {
     return `${origin}/invite/${league.joinCode}`;
   };
 
-  // TODO: League deletion feature - temporarily disabled for production safety
-  /*
-  const handleDeleteLeague = async (leagueId) => {
-    if (!window.confirm('Are you sure you want to delete this league? This action cannot be undone.')) {
+  const handleHideLeague = async (leagueId) => {
+    if (!window.confirm('Are you sure you want to hide this league? It will be hidden from all members but can be restored later.')) {
       return;
     }
 
@@ -257,19 +255,18 @@ const Leagues = () => {
       setError('');
       setSuccess('');
       setDeletingLeagueId(leagueId);
-      await apiClient.delete(`/leagues/${leagueId}`);
-      setSuccess('League deleted successfully');
+      await apiClient.post(`/leagues/${leagueId}/hide`);
+      setSuccess('League hidden successfully');
       // Refresh the leagues list
       await fetchLeagues();
     } catch (err) {
-      setError(err.response?.data?.error || err.response?.data?.message || 'Failed to delete league');
+      setError(err.response?.data?.error || err.response?.data?.message || 'Failed to hide league');
       setSuccess('');
-      console.error('Failed to delete league:', err);
+      console.error('Failed to hide league:', err);
     } finally {
       setDeletingLeagueId(null);
     }
   };
-  */
 
   const isOwner = (league) => {
     return user && league.ownerId && user.id === league.ownerId;
@@ -636,17 +633,16 @@ const Leagues = () => {
                         >
                           View Leaderboard
                         </button>
-                        {/* TODO: League deletion feature - temporarily disabled for production safety */}
-                        {/* {isOwner(league) && (
+                        {isOwner(league) && (
                           <button
-                            onClick={() => handleDeleteLeague(league.id)}
+                            onClick={() => handleHideLeague(league.id)}
                             className="btn-danger btn-small"
                             disabled={deletingLeagueId === league.id}
                             style={{ marginLeft: 'auto' }}
                           >
-                            {deletingLeagueId === league.id ? '⏳ Deleting...' : '🗑️ Delete'}
+                            {deletingLeagueId === league.id ? '⏳ Hiding...' : '👁️‍🗨️ Hide'}
                           </button>
-                        )} */}
+                        )}
                       </div>
                     </div>
                   </div>

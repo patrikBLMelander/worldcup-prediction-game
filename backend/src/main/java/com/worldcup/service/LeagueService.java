@@ -48,8 +48,7 @@ public class LeagueService {
     private final PredictionRepository predictionRepository;
     private final PointsCalculationService pointsCalculationService;
     private final Optional<NotificationService> notificationService; // Optional - may not be available during startup
-    // TODO: Temporarily disabled - only used by deleteLeague feature
-    // private final NotificationRepository notificationRepository;
+    private final NotificationRepository notificationRepository;
 
     public LeagueSummaryDTO createLeague(CreateLeagueRequest request, User owner) {
         if (request.getEndDate().isBefore(request.getStartDate())) {
@@ -112,6 +111,12 @@ public class LeagueService {
             League league = leagueRepository.findByJoinCode(joinCode.trim())
                     .orElseThrow(() -> new LeagueNotFoundException(joinCode));
 
+            // Prevent joining hidden leagues
+            if (Boolean.TRUE.equals(league.getHidden())) {
+                log.warn("User {} attempted to join hidden league {}", user.getId(), league.getId());
+                throw new LeagueNotFoundException(joinCode);
+            }
+
             log.debug("Found league: {}, startDate: {}, endDate: {}", league.getId(), league.getStartDate(), league.getEndDate());
 
             LocalDateTime now = LocalDateTime.now();
@@ -167,7 +172,7 @@ public class LeagueService {
                             "New Member Joined",
                             message,
                             "👤",
-                            "/leagues"
+                            "/leagues?league=" + league.getId()
                         );
                     } catch (Exception e) {
                         log.error("Error sending notification to user {} about new league member: {}", 
@@ -195,6 +200,7 @@ public class LeagueService {
         List<LeagueMembership> memberships = membershipRepository.findByUser(user);
         return memberships.stream()
                 .map(LeagueMembership::getLeague)
+                .filter(league -> !Boolean.TRUE.equals(league.getHidden())) // Filter out hidden leagues
                 .distinct()
                 .map(this::toSummary)
                 .collect(Collectors.toList());
@@ -227,6 +233,11 @@ public class LeagueService {
     public List<LeaderboardEntryDTO> getLeagueLeaderboard(Long leagueId) {
         League league = leagueRepository.findById(leagueId)
                 .orElseThrow(() -> new LeagueNotFoundException(leagueId));
+
+        // Prevent access to hidden leagues
+        if (Boolean.TRUE.equals(league.getHidden())) {
+            throw new LeagueNotFoundException(leagueId);
+        }
 
         LocalDateTime start = league.getStartDate();
         LocalDateTime end = league.getEndDate();
@@ -441,6 +452,11 @@ public class LeagueService {
         League league = leagueRepository.findById(leagueId)
                 .orElseThrow(() -> new LeagueNotFoundException(leagueId));
 
+        // Prevent access to hidden leagues
+        if (Boolean.TRUE.equals(league.getHidden())) {
+            throw new LeagueNotFoundException(leagueId);
+        }
+
         List<LeagueMembership> memberships = membershipRepository.findByLeague(league);
         
         return memberships.stream()
@@ -498,59 +514,59 @@ public class LeagueService {
     }
 
     /**
-     * Deletes a league. Only the owner can delete their league.
-     * This will delete all league memberships and clean up related notifications.
+     * Hides a league (soft delete). Only the owner can hide their league.
+     * Hidden leagues are not shown in lists but all data is preserved.
      * 
-     * TODO: Temporarily disabled for production safety - will be enabled after fixing notification cleanup
-     * 
-     * @param leagueId the ID of the league to delete
-     * @param user the user attempting to delete the league
+     * @param leagueId the ID of the league to hide
+     * @param user the user attempting to hide the league
      * @throws LeagueNotFoundException if the league doesn't exist
      * @throws UnauthorizedException if the user is not the owner of the league
-     * @throws LeagueLockedException if the league has already started
      */
-    /*
     @Transactional
-    public void deleteLeague(Long leagueId, User user) {
+    public void hideLeague(Long leagueId, User user) {
         League league = leagueRepository.findById(leagueId)
                 .orElseThrow(() -> new LeagueNotFoundException(leagueId));
 
-        // Only the owner can delete the league
+        // Only the owner can hide the league
         if (league.getOwner() == null || !league.getOwner().getId().equals(user.getId())) {
-            throw new UnauthorizedException("Only the league owner can delete the league");
+            throw new UnauthorizedException("Only the league owner can hide the league");
         }
 
-        // Prevent deletion of leagues that have already started
-        LocalDateTime now = LocalDateTime.now();
-        if (league.getStartDate().isBefore(now) || league.getStartDate().equals(now)) {
-            throw new LeagueLockedException("Cannot delete a league that has already started");
-        }
+        log.info("Hiding league {} by user {}", leagueId, user.getId());
 
-        log.info("Deleting league {} by user {}", leagueId, user.getId());
+        // Set hidden flag instead of deleting
+        league.setHidden(true);
+        leagueRepository.save(league);
 
-        // Delete all memberships explicitly (no cascade configured in entity)
-        membershipRepository.deleteByLeague(league);
-
-        // Clean up notifications related to this league
-        // Use try-catch to ensure notification cleanup failure doesn't prevent league deletion
-        // Note: This cleanup is best-effort; transaction will commit even if cleanup fails
-        try {
-            // Match notifications with linkUrl containing /leagues?league={id}
-            // This pattern matches both /leagues?league={id} and /leagues?league={id}&other=params
-            String leagueLinkPattern = "%/leagues?league=" + leagueId + "%";
-            int deletedCount = notificationRepository.deleteByLinkUrlContaining(leagueLinkPattern);
-            log.debug("Deleted {} notifications related to league {}", deletedCount, leagueId);
-        } catch (Exception e) {
-            log.warn("Failed to clean up notifications for league {}: {}", leagueId, e.getMessage());
-            // Continue with deletion even if notification cleanup fails
-        }
-
-        // Delete the league
-        leagueRepository.delete(league);
-
-        log.info("Successfully deleted league {}", leagueId);
+        log.info("Successfully hid league {}", leagueId);
     }
-    */
+
+    /**
+     * Unhides a league. Only the owner can unhide their league.
+     * 
+     * @param leagueId the ID of the league to unhide
+     * @param user the user attempting to unhide the league
+     * @throws LeagueNotFoundException if the league doesn't exist
+     * @throws UnauthorizedException if the user is not the owner of the league
+     */
+    @Transactional
+    public void unhideLeague(Long leagueId, User user) {
+        League league = leagueRepository.findById(leagueId)
+                .orElseThrow(() -> new LeagueNotFoundException(leagueId));
+
+        // Only the owner can unhide the league
+        if (league.getOwner() == null || !league.getOwner().getId().equals(user.getId())) {
+            throw new UnauthorizedException("Only the league owner can unhide the league");
+        }
+
+        log.info("Unhiding league {} by user {}", leagueId, user.getId());
+
+        // Remove hidden flag
+        league.setHidden(false);
+        leagueRepository.save(league);
+
+        log.info("Successfully unhid league {}", leagueId);
+    }
 }
 
 

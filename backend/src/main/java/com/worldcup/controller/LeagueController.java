@@ -58,16 +58,19 @@ public class LeagueController {
         return ResponseEntity.ok(members);
     }
 
-    // TODO: League deletion feature - temporarily disabled for production safety
-    // Will be enabled after fixing notification cleanup pattern mismatch
-    /*
-    @DeleteMapping("/{leagueId}")
-    public ResponseEntity<?> deleteLeague(@PathVariable Long leagueId) {
+    @PostMapping("/{leagueId}/hide")
+    public ResponseEntity<?> hideLeague(@PathVariable Long leagueId) {
         User user = currentUser.getCurrentUserOrThrow();
-        leagueService.deleteLeague(leagueId, user);
-        return ResponseEntity.ok().body(java.util.Map.of("message", "League deleted successfully"));
+        leagueService.hideLeague(leagueId, user);
+        return ResponseEntity.ok().body(java.util.Map.of("message", "League hidden successfully"));
     }
-    */
+
+    @PostMapping("/{leagueId}/unhide")
+    public ResponseEntity<?> unhideLeague(@PathVariable Long leagueId) {
+        User user = currentUser.getCurrentUserOrThrow();
+        leagueService.unhideLeague(leagueId, user);
+        return ResponseEntity.ok().body(java.util.Map.of("message", "League unhidden successfully"));
+    }
 }
 
 

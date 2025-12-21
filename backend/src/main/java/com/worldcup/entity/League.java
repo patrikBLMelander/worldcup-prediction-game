@@ -87,6 +87,14 @@ public class League {
     private Boolean achievementsProcessed = false;
 
     /**
+     * Whether this league is hidden (soft delete).
+     * Hidden leagues are not shown in lists but data is preserved.
+     * Only the owner can hide/unhide their league.
+     */
+    @Column(name = "hidden", nullable = false)
+    private Boolean hidden = false;
+
+    /**
      * Betting type for this league.
      * FLAT_STAKES: Everyone pays the same entry price.
      * CUSTOM_STAKES: Each player sets their own stake (future feature).
