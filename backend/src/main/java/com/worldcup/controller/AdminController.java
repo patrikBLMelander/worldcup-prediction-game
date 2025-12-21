@@ -202,6 +202,93 @@ public class AdminController {
         }
     }
 
+    @PostMapping("/matches/{id}/recalculate-points")
+    @Transactional
+    public ResponseEntity<?> recalculatePointsForMatch(@PathVariable Long id) {
+        try {
+            Match match = matchService.findById(id)
+                    .orElseThrow(() -> new IllegalArgumentException("Match not found"));
+            
+            if (match.getStatus() != MatchStatus.FINISHED) {
+                return ResponseEntity.badRequest().body(java.util.Map.of(
+                    "error", "Match must be FINISHED to recalculate points. Current status: " + match.getStatus()
+                ));
+            }
+            
+            if (match.getHomeScore() == null || match.getAwayScore() == null) {
+                return ResponseEntity.badRequest().body(java.util.Map.of(
+                    "error", "Match must have both home and away scores to calculate points"
+                ));
+            }
+            
+            log.info("Admin recalculating points for match {}: {} vs {}", 
+                    id, match.getHomeTeam(), match.getAwayTeam());
+            
+            predictionService.calculatePointsForMatch(id);
+            
+            return ResponseEntity.ok().body(java.util.Map.of(
+                "message", "Points recalculated successfully for match " + id,
+                "match", match.getHomeTeam() + " vs " + match.getAwayTeam(),
+                "score", match.getHomeScore() + " - " + match.getAwayScore()
+            ));
+        } catch (IllegalArgumentException e) {
+            log.error("Match not found: {}", id, e);
+            return ResponseEntity.notFound().build();
+        } catch (IllegalStateException e) {
+            log.error("Cannot recalculate points: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(java.util.Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.error("Error recalculating points for match {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(java.util.Map.of("error", "Failed to recalculate points: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/matches/recalculate-all-finished")
+    @Transactional
+    public ResponseEntity<?> recalculateAllFinishedMatches() {
+        try {
+            log.info("Admin recalculating points for all FINISHED matches");
+            
+            List<Match> finishedMatches = matchService.findByStatus(MatchStatus.FINISHED);
+            int successCount = 0;
+            int errorCount = 0;
+            List<String> errors = new java.util.ArrayList<>();
+            
+            for (Match match : finishedMatches) {
+                if (match.getHomeScore() == null || match.getAwayScore() == null) {
+                    log.debug("Skipping match {} - no scores available", match.getId());
+                    continue;
+                }
+                
+                try {
+                    predictionService.calculatePointsForMatch(match.getId());
+                    successCount++;
+                    log.debug("Recalculated points for match {}: {} vs {}", 
+                            match.getId(), match.getHomeTeam(), match.getAwayTeam());
+                } catch (Exception e) {
+                    errorCount++;
+                    String errorMsg = String.format("Match %d (%s vs %s): %s", 
+                            match.getId(), match.getHomeTeam(), match.getAwayTeam(), e.getMessage());
+                    errors.add(errorMsg);
+                    log.error("Error recalculating points for match {}: {}", match.getId(), e.getMessage());
+                }
+            }
+            
+            return ResponseEntity.ok().body(java.util.Map.of(
+                "message", "Points recalculation completed",
+                "totalMatches", finishedMatches.size(),
+                "successCount", successCount,
+                "errorCount", errorCount,
+                "errors", errors
+            ));
+        } catch (Exception e) {
+            log.error("Error recalculating points for all finished matches: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(java.util.Map.of("error", "Failed to recalculate points: " + e.getMessage()));
+        }
+    }
+
     @PostMapping("/test/notification")
     public ResponseEntity<?> testNotification(@RequestParam(required = false) Long userId) {
         try {

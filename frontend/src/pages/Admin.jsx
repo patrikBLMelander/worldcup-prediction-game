@@ -175,6 +175,46 @@ const Admin = () => {
     }
   };
 
+  const handleRecalculatePoints = async (matchId) => {
+    setError('');
+    setSuccess('');
+    setLoading(true);
+
+    try {
+      const response = await apiClient.post(`/admin/matches/${matchId}/recalculate-points`);
+      setSuccess(response.data.message || 'Points recalculated successfully!');
+      fetchData();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to recalculate points');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRecalculateAllFinished = async () => {
+    if (!window.confirm('This will recalculate points for ALL finished matches. Continue?')) {
+      return;
+    }
+
+    setError('');
+    setSuccess('');
+    setLoading(true);
+
+    try {
+      const response = await apiClient.post('/admin/matches/recalculate-all-finished');
+      const data = response.data;
+      setSuccess(
+        `Recalculation completed: ${data.successCount} successful, ${data.errorCount} errors. ` +
+        (data.errors?.length > 0 ? `Errors: ${data.errors.join('; ')}` : '')
+      );
+      fetchData();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to recalculate points');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (user?.role !== 'ADMIN') {
     return (
       <div className="admin-container">
@@ -253,22 +293,32 @@ const Admin = () => {
           <div className="admin-matches">
             <div className="admin-section-header">
               <h2>Match Management</h2>
-              <button
-                className="btn-primary"
-                onClick={() => {
-                  setShowMatchForm(true);
-                  setEditingMatch(null);
-                  setMatchForm({
-                    homeTeam: '',
-                    awayTeam: '',
-                    matchDate: '',
-                    venue: '',
-                    group: '',
-                  });
-                }}
-              >
-                + Create Match
-              </button>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  className="btn-secondary"
+                  onClick={handleRecalculateAllFinished}
+                  disabled={loading}
+                  title="Recalculate points for all finished matches"
+                >
+                  🔄 Recalculate All Points
+                </button>
+                <button
+                  className="btn-primary"
+                  onClick={() => {
+                    setShowMatchForm(true);
+                    setEditingMatch(null);
+                    setMatchForm({
+                      homeTeam: '',
+                      awayTeam: '',
+                      matchDate: '',
+                      venue: '',
+                      group: '',
+                    });
+                  }}
+                >
+                  + Create Match
+                </button>
+              </div>
             </div>
 
             {showMatchForm && (
@@ -372,6 +422,7 @@ const Admin = () => {
                       onUpdateResult={handleUpdateMatchResult}
                       onUpdateStatus={handleUpdateMatchStatus}
                       onDelete={handleDeleteMatch}
+                      onRecalculatePoints={handleRecalculatePoints}
                     />
                   ))}
                 </tbody>
@@ -416,10 +467,11 @@ const Admin = () => {
   );
 };
 
-const MatchRow = ({ match, onUpdateResult, onUpdateStatus, onDelete }) => {
+const MatchRow = ({ match, onUpdateResult, onUpdateStatus, onDelete, onRecalculatePoints }) => {
   const [homeScore, setHomeScore] = useState(match.homeScore?.toString() || '');
   const [awayScore, setAwayScore] = useState(match.awayScore?.toString() || '');
   const [showResultInput, setShowResultInput] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
 
   const handleSaveResult = () => {
     if (homeScore && awayScore) {
@@ -510,12 +562,32 @@ const MatchRow = ({ match, onUpdateResult, onUpdateStatus, onDelete }) => {
         )}
       </td>
       <td>
-        <button
-          onClick={() => onDelete(match.id)}
-          className="btn-small btn-danger"
-        >
-          Delete
-        </button>
+        <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+          {match.status === 'FINISHED' && match.homeScore !== null && match.awayScore !== null && (
+            <button
+              onClick={async () => {
+                setRecalculating(true);
+                try {
+                  await onRecalculatePoints(match.id);
+                } finally {
+                  setRecalculating(false);
+                }
+              }}
+              className="btn-small"
+              disabled={recalculating}
+              title="Recalculate points for this match"
+              style={{ fontSize: '12px' }}
+            >
+              {recalculating ? '⏳' : '🔄'} Points
+            </button>
+          )}
+          <button
+            onClick={() => onDelete(match.id)}
+            className="btn-small btn-danger"
+          >
+            Delete
+          </button>
+        </div>
       </td>
     </tr>
   );

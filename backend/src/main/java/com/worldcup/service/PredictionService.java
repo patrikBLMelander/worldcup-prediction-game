@@ -103,49 +103,66 @@ public class PredictionService {
                 continue;
             }
             
+            // Only recalculate if points are null OR if we need to verify correctness
+            // This prevents overwriting correct points if called multiple times
+            // However, always recalculate to ensure points match current match scores
+            // (in case match scores were corrected after initial calculation)
             try {
-                int points = calculatePoints(
+                int calculatedPoints = calculatePoints(
                     prediction.getPredictedHomeScore(),
                     prediction.getPredictedAwayScore(),
                     match.getHomeScore(),
                     match.getAwayScore()
                 );
-                prediction.setPoints(points);
-                predictionRepository.save(prediction);
                 
-                // Send notification about match result
-                if (notificationService != null) {
-                    try {
-                        String message = String.format("%s %d - %d %s. You earned %d point%s!",
-                            match.getHomeTeam(),
-                            match.getHomeScore(),
-                            match.getAwayScore(),
-                            match.getAwayTeam(),
-                            points,
-                            points != 1 ? "s" : ""
-                        );
-                        
-                        notificationService.sendNotification(
-                            prediction.getUser(),
-                            Notification.NotificationType.MATCH_RESULT,
-                            "Match Result",
-                            message,
-                            "⚽",
-                            "/matches?tab=results"
-                        );
-                    } catch (Exception e) {
-                        log.error("Error sending match result notification for prediction {}: {}", 
-                                prediction.getId(), e.getMessage());
+                // Only update if points are null or different (to avoid unnecessary writes)
+                // This handles cases where scores were corrected after initial calculation
+                Integer existingPoints = prediction.getPoints();
+                if (existingPoints == null || !existingPoints.equals(calculatedPoints)) {
+                    prediction.setPoints(calculatedPoints);
+                    predictionRepository.save(prediction);
+                    
+                    // Only send notification if this is a new calculation (points were null)
+                    // or if points increased (score correction that benefits the user)
+                    boolean shouldNotify = existingPoints == null || calculatedPoints > (existingPoints != null ? existingPoints : 0);
+                    
+                    if (shouldNotify && notificationService != null) {
+                        try {
+                            String message = String.format("%s %d - %d %s. You earned %d point%s!",
+                                match.getHomeTeam(),
+                                match.getHomeScore(),
+                                match.getAwayScore(),
+                                match.getAwayTeam(),
+                                calculatedPoints,
+                                calculatedPoints != 1 ? "s" : ""
+                            );
+                            
+                            notificationService.sendNotification(
+                                prediction.getUser(),
+                                Notification.NotificationType.MATCH_RESULT,
+                                "Match Result",
+                                message,
+                                "⚽",
+                                "/matches?tab=results"
+                            );
+                        } catch (Exception e) {
+                            log.error("Error sending match result notification for prediction {}: {}", 
+                                    prediction.getId(), e.getMessage());
+                        }
                     }
-                }
-                
-                // Check achievements after points are calculated
-                if (achievementService != null) {
-                    try {
-                        achievementService.checkAchievementsAfterMatchResult(prediction.getUser(), prediction);
-                    } catch (Exception e) {
-                        log.error("Error checking achievements for prediction {}: {}", prediction.getId(), e.getMessage());
+                    
+                    // Check achievements after points are calculated/updated
+                    if (achievementService != null) {
+                        try {
+                            achievementService.checkAchievementsAfterMatchResult(prediction.getUser(), prediction);
+                        } catch (Exception e) {
+                            log.error("Error checking achievements for prediction {}: {}", prediction.getId(), e.getMessage());
+                        }
                     }
+                } else {
+                    // Points are already correct, skip notification and achievement check
+                    log.debug("Points for prediction {} already correct ({}), skipping update", 
+                            prediction.getId(), calculatedPoints);
                 }
             } catch (Exception e) {
                 // Log error but continue processing other predictions
