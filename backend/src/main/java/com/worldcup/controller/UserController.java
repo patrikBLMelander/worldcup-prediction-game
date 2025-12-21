@@ -22,8 +22,11 @@ import com.worldcup.repository.PredictionRepository;
 import com.worldcup.repository.UserAchievementRepository;
 import com.worldcup.repository.UserRepository;
 import com.worldcup.security.CurrentUser;
+import com.worldcup.service.PointsCalculationService;
 import com.worldcup.service.PredictionService;
 import com.worldcup.service.UserService;
+
+import static com.worldcup.service.PointsCalculationService.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -44,6 +47,7 @@ public class UserController {
 
     private final CurrentUser currentUser;
     private final PredictionService predictionService;
+    private final PointsCalculationService pointsCalculationService;
     private final UserRepository userRepository;
     private final PredictionRepository predictionRepository;
     private final UserService userService;
@@ -243,7 +247,7 @@ public class UserController {
                     // Only calculate and save points for FINISHED matches
                     // For LIVE matches, only display points if already calculated (don't calculate new ones as scores can change)
                     if (points == null && status == MatchStatus.FINISHED && match.getHomeScore() != null && match.getAwayScore() != null) {
-                        points = predictionService.calculatePointsForPrediction(
+                        points = pointsCalculationService.calculatePoints(
                             p.getPredictedHomeScore(),
                             p.getPredictedAwayScore(),
                             match.getHomeScore(),
@@ -256,7 +260,7 @@ public class UserController {
                     
                     // For LIVE matches, calculate points on-the-fly for display only (don't save)
                     if (points == null && status == MatchStatus.LIVE && match.getHomeScore() != null && match.getAwayScore() != null) {
-                        points = predictionService.calculatePointsForPrediction(
+                        points = pointsCalculationService.calculatePoints(
                             p.getPredictedHomeScore(),
                             p.getPredictedAwayScore(),
                             match.getHomeScore(),
@@ -266,9 +270,9 @@ public class UserController {
                     }
                     
                     String resultType;
-                    if (points == null || points == 0) {
+                    if (points == null || points == WRONG_PREDICTION_POINTS) {
                         resultType = "WRONG";
-                    } else if (points == 3) {
+                    } else if (points == EXACT_SCORE_POINTS) {
                         resultType = "EXACT";
                     } else {
                         resultType = "CORRECT_WINNER";

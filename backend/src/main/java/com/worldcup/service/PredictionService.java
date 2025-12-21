@@ -30,10 +30,9 @@ public class PredictionService {
 
     private final PredictionRepository predictionRepository;
     private final MatchService matchService;
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private AchievementService achievementService; // Optional - may not be available during startup
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private NotificationService notificationService; // Optional - may not be available during startup
+    private final PointsCalculationService pointsCalculationService;
+    private final Optional<AchievementService> achievementService; // Optional - may not be available during startup
+    private final Optional<NotificationService> notificationService; // Optional - may not be available during startup
 
     public Prediction createOrUpdatePrediction(User user, Long matchId, 
                                               Integer predictedHomeScore, 
@@ -112,7 +111,7 @@ public class PredictionService {
             // However, always recalculate to ensure points match current match scores
             // (in case match scores were corrected after initial calculation)
             try {
-                int calculatedPoints = calculatePoints(
+                int calculatedPoints = pointsCalculationService.calculatePoints(
                     prediction.getPredictedHomeScore(),
                     prediction.getPredictedAwayScore(),
                     match.getHomeScore(),
@@ -130,39 +129,41 @@ public class PredictionService {
                     // or if points increased (score correction that benefits the user)
                     boolean shouldNotify = existingPoints == null || calculatedPoints > (existingPoints != null ? existingPoints : 0);
                     
-                    if (shouldNotify && notificationService != null) {
-                        try {
-                            String message = String.format("%s %d - %d %s. You earned %d point%s!",
-                                match.getHomeTeam(),
-                                match.getHomeScore(),
-                                match.getAwayScore(),
-                                match.getAwayTeam(),
-                                calculatedPoints,
-                                calculatedPoints != 1 ? "s" : ""
-                            );
-                            
-                            notificationService.sendNotification(
-                                prediction.getUser(),
-                                Notification.NotificationType.MATCH_RESULT,
-                                "Match Result",
-                                message,
-                                "⚽",
-                                "/matches?tab=results"
-                            );
-                        } catch (Exception e) {
-                            log.error("Error sending match result notification for prediction {}: {}", 
-                                    prediction.getId(), e.getMessage());
-                        }
+                    if (shouldNotify) {
+                        notificationService.ifPresent(service -> {
+                            try {
+                                String message = String.format("%s %d - %d %s. You earned %d point%s!",
+                                    match.getHomeTeam(),
+                                    match.getHomeScore(),
+                                    match.getAwayScore(),
+                                    match.getAwayTeam(),
+                                    calculatedPoints,
+                                    calculatedPoints != 1 ? "s" : ""
+                                );
+                                
+                                service.sendNotification(
+                                    prediction.getUser(),
+                                    Notification.NotificationType.MATCH_RESULT,
+                                    "Match Result",
+                                    message,
+                                    "⚽",
+                                    "/matches?tab=results"
+                                );
+                            } catch (Exception e) {
+                                log.error("Error sending match result notification for prediction {}: {}", 
+                                        prediction.getId(), e.getMessage());
+                            }
+                        });
                     }
                     
                     // Check achievements after points are calculated/updated
-                    if (achievementService != null) {
+                    achievementService.ifPresent(service -> {
                         try {
-                            achievementService.checkAchievementsAfterMatchResult(prediction.getUser(), prediction);
+                            service.checkAchievementsAfterMatchResult(prediction.getUser(), prediction);
                         } catch (Exception e) {
                             log.error("Error checking achievements for prediction {}: {}", prediction.getId(), e.getMessage());
                         }
-                    }
+                    });
                 } else {
                     // Points are already correct, skip notification and achievement check
                     log.debug("Points for prediction {} already correct ({}), skipping update", 
@@ -175,37 +176,6 @@ public class PredictionService {
         }
     }
 
-    private int calculatePoints(int predictedHome, int predictedAway, 
-                               int actualHome, int actualAway) {
-        // Exact score match: 3 points
-        if (predictedHome == actualHome && predictedAway == actualAway) {
-            return 3;
-        }
-
-        // Correct winner (not exact score): 1 point
-        boolean predictedHomeWins = predictedHome > predictedAway;
-        boolean predictedAwayWins = predictedAway > predictedHome;
-        boolean predictedDraw = predictedHome == predictedAway;
-
-        boolean actualHomeWins = actualHome > actualAway;
-        boolean actualAwayWins = actualAway > actualHome;
-        boolean actualDraw = actualHome == actualAway;
-
-        if (predictedHomeWins && actualHomeWins) return 1;
-        if (predictedAwayWins && actualAwayWins) return 1;
-        if (predictedDraw && actualDraw) return 1;
-
-        // Wrong prediction: 0 points
-        return 0;
-    }
-
-    /**
-     * Calculate points for a prediction (public method for use in controllers)
-     */
-    public int calculatePointsForPrediction(int predictedHome, int predictedAway,
-                                           int actualHome, int actualAway) {
-        return calculatePoints(predictedHome, predictedAway, actualHome, actualAway);
-    }
 
     public PredictionStatisticsDTO getPredictionStatistics(User user) {
         // Use JOIN FETCH to ensure match data is loaded for filtering
@@ -250,7 +220,7 @@ public class PredictionService {
                     // For LIVE matches, calculate on-the-fly for display only (don't save)
                     if (p.getPoints() == null && match != null && match.getHomeScore() != null && match.getAwayScore() != null &&
                         p.getPredictedHomeScore() != null && p.getPredictedAwayScore() != null) {
-                        int points = calculatePoints(
+                        int points = pointsCalculationService.calculatePoints(
                             p.getPredictedHomeScore(),
                             p.getPredictedAwayScore(),
                             match.getHomeScore(),
@@ -284,9 +254,9 @@ public class PredictionService {
             Integer points = pred.getPoints();
             if (points != null) {
                 totalPoints += points;
-                if (points == 3) {
+                if (points == PointsCalculationService.EXACT_SCORE_POINTS) {
                     exactScores++;
-                } else if (points == 1) {
+                } else if (points == PointsCalculationService.CORRECT_WINNER_POINTS) {
                     correctWinners++;
                 } else {
                     wrongPredictions++;
@@ -352,7 +322,7 @@ public class PredictionService {
                     // For LIVE matches, calculate on-the-fly for display only (don't save)
                     if (p.getPoints() == null && match != null && match.getHomeScore() != null && match.getAwayScore() != null &&
                         p.getPredictedHomeScore() != null && p.getPredictedAwayScore() != null) {
-                        int points = calculatePoints(
+                        int points = pointsCalculationService.calculatePoints(
                             p.getPredictedHomeScore(),
                             p.getPredictedAwayScore(),
                             match.getHomeScore(),
@@ -393,9 +363,9 @@ public class PredictionService {
             cumulativePoints += (points != null ? points : 0);
             
             String resultType;
-            if (points == null || points == 0) {
+            if (points == null || points == PointsCalculationService.WRONG_PREDICTION_POINTS) {
                 resultType = "WRONG";
-            } else if (points == 3) {
+            } else if (points == PointsCalculationService.EXACT_SCORE_POINTS) {
                 resultType = "EXACT";
             } else {
                 resultType = "CORRECT_WINNER";

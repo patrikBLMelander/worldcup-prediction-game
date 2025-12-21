@@ -21,7 +21,6 @@ import com.worldcup.repository.PredictionRepository;
 import com.worldcup.entity.Notification;
 import lombok.extern.slf4j.Slf4j;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,9 +43,8 @@ public class LeagueService {
     private final LeagueRepository leagueRepository;
     private final LeagueMembershipRepository membershipRepository;
     private final PredictionRepository predictionRepository;
-    private final PredictionService predictionService;
-    @Autowired(required = false)
-    private NotificationService notificationService; // Optional - may not be available during startup
+    private final PointsCalculationService pointsCalculationService;
+    private final Optional<NotificationService> notificationService; // Optional - may not be available during startup
 
     public LeagueSummaryDTO createLeague(CreateLeagueRequest request, User owner) {
         if (request.getEndDate().isBefore(request.getStartDate())) {
@@ -133,7 +131,7 @@ public class LeagueService {
             membershipRepository.save(membership);
 
         // Notify all existing members (excluding the new member who just joined)
-        if (notificationService != null) {
+        notificationService.ifPresent(service -> {
             try {
                 List<LeagueMembership> existingMembers = membershipRepository.findByLeague(league);
                 String newMemberName = user.getScreenName() != null && !user.getScreenName().isEmpty() 
@@ -148,7 +146,7 @@ public class LeagueService {
                     }
                     
                     try {
-                        notificationService.sendNotification(
+                        service.sendNotification(
                             existingMember.getUser(),
                             Notification.NotificationType.LEAGUE_MEMBER_JOINED,
                             "New Member Joined",
@@ -165,7 +163,7 @@ public class LeagueService {
                 log.error("Error notifying league members about new join: {}", e.getMessage());
                 // Don't fail the join operation if notification fails
             }
-        }
+        });
 
             return toSummary(league);
         } catch (IllegalArgumentException | IllegalStateException e) {
@@ -357,7 +355,7 @@ public class LeagueService {
             if (points == null &&
                 p.getPredictedHomeScore() != null &&
                 p.getPredictedAwayScore() != null) {
-                points = predictionService.calculatePointsForPrediction(
+                points = pointsCalculationService.calculatePoints(
                         p.getPredictedHomeScore(),
                         p.getPredictedAwayScore(),
                         match.getHomeScore(),
