@@ -41,10 +41,10 @@ public class FootballApiSyncScheduler {
     private boolean apiEnabled;
 
     /**
-     * Sync fixtures - runs every hour
+     * Sync fixtures - configurable interval (default: every hour)
      * Fetches matches for the next 7 days
      */
-    @Scheduled(fixedRate = 3600000) // Every hour
+    @Scheduled(fixedRateString = "${football.api.sync.fixtures.interval:3600000}")
     @Transactional
     public void syncFixtures() {
         syncFixturesInternal();
@@ -102,10 +102,10 @@ public class FootballApiSyncScheduler {
     }
 
     /**
-     * Sync live scores - runs every 60 seconds during match days
+     * Sync live scores - configurable interval (default: every 60 seconds)
      * Fetches matches that are currently live
      */
-    @Scheduled(fixedRate = 60000) // Every 60 seconds
+    @Scheduled(fixedRateString = "${football.api.sync.live.interval:60000}")
     @Transactional
     public void syncLiveScores() {
         if (!apiEnabled) {
@@ -158,10 +158,10 @@ public class FootballApiSyncScheduler {
     }
 
     /**
-     * Sync finished matches - runs every 5 minutes
+     * Sync finished matches - configurable interval (default: every 5 minutes)
      * Updates scores for recently finished matches
      */
-    @Scheduled(fixedRate = 300000) // Every 5 minutes
+    @Scheduled(fixedRateString = "${football.api.sync.finished.interval:300000}")
     @Transactional
     public void syncFinishedMatches() {
         if (!apiEnabled) {
