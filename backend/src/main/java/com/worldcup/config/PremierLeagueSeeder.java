@@ -31,6 +31,11 @@ public class PremierLeagueSeeder implements CommandLineRunner {
     @Value("${football.api.enabled:false}")
     private boolean apiEnabled;
 
+    @Value("${football.api.competition-id:}")
+    private String competitionId;
+
+    private static final String PREMIER_LEAGUE_COMPETITION_ID = "2021";
+
     // Premier League teams
     private static final String[] PREMIER_LEAGUE_TEAMS = {
         "Arsenal", "Aston Villa", "Bournemouth", "Brentford", "Brighton",
@@ -52,6 +57,11 @@ public class PremierLeagueSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        if (!PREMIER_LEAGUE_COMPETITION_ID.equals(competitionId)) {
+            log.info("Configured competition is {}, skipping Premier League seeder", competitionId);
+            return;
+        }
+
         // Check if Premier League matches already exist
         long premierLeagueCount = matchRepository.findAll().stream()
             .filter(m -> m.getGroup() != null && m.getGroup().equals("Premier League"))

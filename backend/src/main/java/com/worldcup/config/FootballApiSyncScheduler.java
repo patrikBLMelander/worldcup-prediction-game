@@ -41,8 +41,9 @@ public class FootballApiSyncScheduler {
     private boolean apiEnabled;
 
     /**
-     * Sync fixtures - configurable interval (default: every hour)
-     * Fetches matches for the next 7 days
+     * Sync fixtures - configurable interval (default: every hour).
+     * Pulls the entire competition each run so knockout placeholders get
+     * upgraded to real teams as soon as the bracket resolves.
      */
     @Scheduled(fixedRateString = "${football.api.sync.fixtures.interval:3600000}")
     @Transactional
@@ -61,10 +62,7 @@ public class FootballApiSyncScheduler {
 
         try {
             log.info("Syncing fixtures from Football API...");
-            LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
-            LocalDateTime endDate = now.plusDays(7);
-
-            List<FootballApiService.MatchData> apiMatches = footballApiService.fetchMatches(now, endDate);
+            List<FootballApiService.MatchData> apiMatches = footballApiService.fetchAllMatches();
 
             // Group existing matches by external API ID
             // Only fetch matches with external API IDs to avoid loading all matches into memory

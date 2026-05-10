@@ -11,6 +11,11 @@ import com.worldcup.exception.InvalidMatchStateException;
 import com.worldcup.exception.MatchNotFoundException;
 import com.worldcup.exception.MatchResultNotAvailableException;
 import com.worldcup.exception.UserNotFoundException;
+import com.worldcup.repository.LeagueRepository;
+import com.worldcup.repository.MatchRepository;
+import com.worldcup.repository.NotificationRepository;
+import com.worldcup.repository.PredictionRepository;
+import com.worldcup.repository.UserAchievementRepository;
 import com.worldcup.repository.UserRepository;
 import com.worldcup.security.AdminRequired;
 import com.worldcup.config.FootballApiSyncScheduler;
@@ -45,6 +50,14 @@ public class AdminController {
     private final WebSocketService webSocketService;
     private final FootballApiSyncScheduler footballApiSyncScheduler;
     private final NotificationService notificationService;
+    private final MatchRepository matchRepository;
+    private final PredictionRepository predictionRepository;
+    private final LeagueRepository leagueRepository;
+    private final UserAchievementRepository userAchievementRepository;
+    private final NotificationRepository notificationRepository;
+
+    private static final String CLEANUP_CONFIRM_TOKEN = "YES_DELETE_TEST_DATA";
+    private static final long MIN_KEEP_MATCHES = 50;
 
     @GetMapping("/users")
     public ResponseEntity<List<UserInfoDTO>> getAllUsers() {
@@ -324,6 +337,64 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(java.util.Map.of("error", "Failed to send test notification: " + e.getMessage()));
         }
+    }
+
+    /**
+     * One-shot cleanup of test data accumulated before the World Cup.
+     * Deletes Premier League matches, mock-seeded matches without an external
+     * API id, and their predictions; hides all existing leagues; clears
+     * earned achievements and notifications.
+     *
+     * Requires <code>?confirm=YES_DELETE_TEST_DATA</code> and refuses to run
+     * unless WC fixtures have already been synced (sanity check on the
+     * "matches we'd keep" count).
+     */
+    @PostMapping("/cleanup-test-data")
+    @Transactional
+    public ResponseEntity<?> cleanupTestData(@RequestParam(required = false) String confirm) {
+        if (!CLEANUP_CONFIRM_TOKEN.equals(confirm)) {
+            return ResponseEntity.badRequest().body(java.util.Map.of(
+                "error", "Confirmation required",
+                "instruction", "POST /api/admin/cleanup-test-data?confirm=" + CLEANUP_CONFIRM_TOKEN
+            ));
+        }
+
+        long keepCount = matchRepository.countMatchesToKeep();
+        if (keepCount < MIN_KEEP_MATCHES) {
+            return ResponseEntity.badRequest().body(java.util.Map.of(
+                "error", "Refusing cleanup: only " + keepCount + " keepable matches found",
+                "minimumExpected", MIN_KEEP_MATCHES,
+                "instruction", "Run POST /api/admin/sync/fixtures first to sync WC fixtures"
+            ));
+        }
+
+        log.warn("Admin cleanup-test-data starting. Keepable matches before: {}", keepCount);
+
+        int predictionsDeleted = predictionRepository.deletePredictionsForTestAndPremierLeagueMatches();
+        int matchesDeleted = matchRepository.deleteTestAndPremierLeagueMatches();
+        int leaguesHidden = leagueRepository.hideAllAndResetAchievementsProcessed();
+
+        long userAchievementsDeleted = userAchievementRepository.count();
+        userAchievementRepository.deleteAllInBatch();
+
+        long notificationsDeleted = notificationRepository.count();
+        notificationRepository.deleteAllInBatch();
+
+        long keepCountAfter = matchRepository.countMatchesToKeep();
+
+        log.warn("Admin cleanup-test-data finished. predictionsDeleted={}, matchesDeleted={}, "
+                + "leaguesHidden={}, userAchievementsDeleted={}, notificationsDeleted={}, keepableMatchesAfter={}",
+                predictionsDeleted, matchesDeleted, leaguesHidden,
+                userAchievementsDeleted, notificationsDeleted, keepCountAfter);
+
+        return ResponseEntity.ok(java.util.Map.of(
+            "predictionsDeleted", predictionsDeleted,
+            "matchesDeleted", matchesDeleted,
+            "leaguesHidden", leaguesHidden,
+            "userAchievementsDeleted", userAchievementsDeleted,
+            "notificationsDeleted", notificationsDeleted,
+            "keepableMatchesAfter", keepCountAfter
+        ));
     }
 
     private MatchDTO convertToDTO(Match match) {

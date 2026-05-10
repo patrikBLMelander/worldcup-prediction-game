@@ -90,6 +90,67 @@ public class FootballApiService {
     }
 
     /**
+     * Fetch all matches for the configured competition (no date filter).
+     * Used for cup-style competitions like the World Cup where the whole
+     * tournament fits in one response (~104 matches).
+     */
+    public List<MatchData> fetchAllMatches() {
+        if (!apiEnabled || apiKey == null || apiKey.isEmpty()) {
+            log.warn("Football API is not enabled or API key is missing");
+            return new ArrayList<>();
+        }
+
+        try {
+            String url = baseUrl + "/competitions/" + competitionId + "/matches";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Auth-Token", apiKey);
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+
+            log.info("Fetching all matches for competition {}", competitionId);
+            ResponseEntity<MatchesResponse> response = restTemplate.exchange(
+                    url, HttpMethod.GET, entity, MatchesResponse.class);
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                log.info("Successfully fetched {} matches from API", response.getBody().matches.size());
+                return response.getBody().matches;
+            } else {
+                log.warn("Failed to fetch matches: {}", response.getStatusCode());
+                return new ArrayList<>();
+            }
+        } catch (Exception e) {
+            log.error("Error fetching matches from Football API: {}", e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Map API stage/group to a human-readable label stored in Match.group.
+     * Group stage uses the group letter ("Group A"); knockout rounds use the
+     * stage name ("Round of 16", "Quarter-Final", etc.).
+     */
+    private String stageLabel(MatchData m) {
+        if (m.group != null && !m.group.isBlank()) {
+            // e.g. "GROUP_A" -> "Group A"
+            String letter = m.group.replace("GROUP_", "");
+            return "Group " + letter;
+        }
+        if (m.stage == null) {
+            return null;
+        }
+        return switch (m.stage) {
+            case "GROUP_STAGE" -> "Group Stage";
+            case "LAST_32" -> "Round of 32";
+            case "LAST_16" -> "Round of 16";
+            case "QUARTER_FINALS" -> "Quarter-Final";
+            case "SEMI_FINALS" -> "Semi-Final";
+            case "THIRD_PLACE" -> "Third-Place Play-off";
+            case "FINAL" -> "Final";
+            default -> m.stage;
+        };
+    }
+
+    /**
      * Fetch live matches (matches in progress)
      */
     public List<MatchData> fetchLiveMatches() {
@@ -124,25 +185,32 @@ public class FootballApiService {
     public Match convertToMatch(MatchData apiMatch) {
         Match match = new Match();
         match.setExternalApiId(String.valueOf(apiMatch.id));
-        
-        if (apiMatch.homeTeam != null) {
+
+        // Knockout matches arrive with null teams until the bracket resolves.
+        // Match.homeTeam/awayTeam are @NotBlank, so use "TBD" as a placeholder;
+        // updateMatchFromApi will fill in real names on a later sync.
+        if (apiMatch.homeTeam != null && apiMatch.homeTeam.name != null) {
             match.setHomeTeam(apiMatch.homeTeam.name);
             match.setHomeTeamCrest(apiMatch.homeTeam.crest);
+        } else {
+            match.setHomeTeam("TBD");
         }
-        
-        if (apiMatch.awayTeam != null) {
+
+        if (apiMatch.awayTeam != null && apiMatch.awayTeam.name != null) {
             match.setAwayTeam(apiMatch.awayTeam.name);
             match.setAwayTeamCrest(apiMatch.awayTeam.crest);
+        } else {
+            match.setAwayTeam("TBD");
         }
-        
+
         // Convert UTC date to LocalDateTime
         if (apiMatch.utcDate != null) {
             ZonedDateTime zonedDateTime = ZonedDateTime.parse(apiMatch.utcDate, API_DATE_FORMATTER);
             match.setMatchDate(zonedDateTime.withZoneSameInstant(ZoneId.of("UTC")).toLocalDateTime());
         }
-        
+
         match.setVenue(apiMatch.venue != null ? apiMatch.venue : "TBD");
-        match.setGroup("Premier League");
+        match.setGroup(stageLabel(apiMatch));
         
         // Map API status to our status
         if (apiMatch.status != null) {
@@ -186,13 +254,23 @@ public class FootballApiService {
             }
         }
         
-        // Update team crests if available
-        if (apiMatch.homeTeam != null && apiMatch.homeTeam.crest != null) {
-            existingMatch.setHomeTeamCrest(apiMatch.homeTeam.crest);
+        // Update teams + crests when the API has them (knockout slots arrive
+        // as null and get filled in once bracket placements resolve).
+        if (apiMatch.homeTeam != null && apiMatch.homeTeam.name != null) {
+            existingMatch.setHomeTeam(apiMatch.homeTeam.name);
+            if (apiMatch.homeTeam.crest != null) {
+                existingMatch.setHomeTeamCrest(apiMatch.homeTeam.crest);
+            }
         }
-        if (apiMatch.awayTeam != null && apiMatch.awayTeam.crest != null) {
-            existingMatch.setAwayTeamCrest(apiMatch.awayTeam.crest);
+        if (apiMatch.awayTeam != null && apiMatch.awayTeam.name != null) {
+            existingMatch.setAwayTeam(apiMatch.awayTeam.name);
+            if (apiMatch.awayTeam.crest != null) {
+                existingMatch.setAwayTeamCrest(apiMatch.awayTeam.crest);
+            }
         }
+
+        // Update group/stage label (e.g. when API moves a match between rounds)
+        existingMatch.setGroup(stageLabel(apiMatch));
         
         // Update scores
         if (apiMatch.score != null) {
@@ -226,6 +304,8 @@ public class FootballApiService {
         public Long id;
         public String status;
         public String utcDate;
+        public String stage; // e.g. GROUP_STAGE, LAST_16, QUARTER_FINALS, FINAL
+        public String group; // e.g. GROUP_A (only set for GROUP_STAGE)
         public TeamData homeTeam;
         public TeamData awayTeam;
         public ScoreData score;

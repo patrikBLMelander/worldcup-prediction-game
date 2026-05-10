@@ -5,6 +5,7 @@ import com.worldcup.entity.MatchStatus;
 import com.worldcup.entity.Prediction;
 import com.worldcup.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -42,6 +43,17 @@ public interface PredictionRepository extends JpaRepository<Prediction, Long> {
            "GROUP BY p.user.id " +
            "ORDER BY totalPoints DESC")
     List<Object[]> findLeaderboard();
+
+    // Deletes predictions tied to Premier League or mock-seeded matches.
+    // Must run before deleteTestAndPremierLeagueMatches() to satisfy FKs.
+    @Modifying
+    @Query(value = "DELETE FROM predictions WHERE match_id IN (" +
+            "  SELECT id FROM matches " +
+            "  WHERE match_group = 'Premier League' " +
+            "     OR external_api_id IS NULL OR external_api_id = ''" +
+            ")",
+            nativeQuery = true)
+    int deletePredictionsForTestAndPremierLeagueMatches();
 }
 
 

@@ -5,6 +5,7 @@ import com.worldcup.entity.MatchStatus;
 import com.worldcup.repository.MatchRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -25,14 +26,22 @@ public class DataSeeder implements CommandLineRunner {
 
     private final MatchRepository matchRepository;
 
+    @Value("${football.api.enabled:false}")
+    private boolean apiEnabled;
+
     @Override
     public void run(String... args) {
+        if (apiEnabled) {
+            log.info("Football API is enabled - skipping mock data seeding (live fixtures will be synced)");
+            return;
+        }
+
         if (matchRepository.count() > 0) {
             log.info("Matches already exist, skipping data seeding");
             return;
         }
 
-        log.info("Seeding World Cup 2026 match data...");
+        log.info("Seeding World Cup mock match data (offline fallback)...");
 
         // World Cup 2026 is scheduled for June-July 2026
         // Using dates in 2026 for the tournament
