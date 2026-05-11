@@ -44,16 +44,20 @@ public interface PredictionRepository extends JpaRepository<Prediction, Long> {
            "ORDER BY totalPoints DESC")
     List<Object[]> findLeaderboard();
 
-    // Deletes predictions tied to Premier League or mock-seeded matches.
-    // Must run before deleteTestAndPremierLeagueMatches() to satisfy FKs.
+    // Deletes predictions tied to any non-World-Cup match. Mirrors the
+    // allow-list in MatchRepository.deleteNonWorldCupMatches(); must run
+    // first to satisfy the predictions.match_id foreign key.
     @Modifying
     @Query(value = "DELETE FROM predictions WHERE match_id IN (" +
-            "  SELECT id FROM matches " +
-            "  WHERE match_group = 'Premier League' " +
-            "     OR external_api_id IS NULL OR external_api_id = ''" +
+            "  SELECT id FROM matches WHERE NOT (" +
+            "    external_api_id IS NOT NULL AND external_api_id <> '' " +
+            "    AND (match_group LIKE 'Group %' " +
+            "         OR match_group IN ('Round of 32','Round of 16','Quarter-Final'," +
+            "                            'Semi-Final','Third-Place Play-off','Final'))" +
+            "  )" +
             ")",
             nativeQuery = true)
-    int deletePredictionsForTestAndPremierLeagueMatches();
+    int deletePredictionsForNonWorldCupMatches();
 }
 
 

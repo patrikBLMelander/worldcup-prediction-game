@@ -23,22 +23,38 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     @Query("SELECT m FROM Match m WHERE m.externalApiId IS NOT NULL AND m.externalApiId != ''")
     List<Match> findAllWithExternalApiId();
 
-    // Counts matches we want to keep (API-sourced and not Premier League).
-    // Used by the cleanup endpoint to refuse running before WC fixtures are synced.
+    // Allow-list of World Cup stage labels produced by FootballApiService.stageLabel().
+    // Used as the "keep" set for cleanup so we don't have to enumerate every
+    // possible foreign stage label (Premier League "REGULAR_SEASON", etc.).
+    String WC_GROUP_LIKE = "Group %";
+    String[] WC_KNOCKOUT_LABELS = {
+        "Round of 32", "Round of 16", "Quarter-Final",
+        "Semi-Final", "Third-Place Play-off", "Final"
+    };
+
+    // Counts API-sourced matches with a World Cup stage label. The cleanup
+    // endpoint refuses to run if this is too low (i.e. WC sync hasn't completed).
     @Query(value = "SELECT COUNT(*) FROM matches " +
             "WHERE external_api_id IS NOT NULL AND external_api_id <> '' " +
-            "AND (match_group IS NULL OR match_group <> 'Premier League')",
+            "AND (match_group LIKE 'Group %' " +
+            "     OR match_group IN ('Round of 32','Round of 16','Quarter-Final'," +
+            "                        'Semi-Final','Third-Place Play-off','Final'))",
             nativeQuery = true)
     long countMatchesToKeep();
 
-    // Deletes Premier League matches and any mock-seeded matches lacking
-    // an external API id. Predictions must be deleted first.
+    // Deletes every match that isn't an API-sourced World Cup fixture.
+    // Catches: PL matches (group 'REGULAR_SEASON' or 'Premier League'),
+    // mock-seeded matches (external_api_id is null), and any other foreign
+    // competition residue. Predictions must be deleted first.
     @Modifying
-    @Query(value = "DELETE FROM matches " +
-            "WHERE match_group = 'Premier League' " +
-            "OR external_api_id IS NULL OR external_api_id = ''",
+    @Query(value = "DELETE FROM matches WHERE NOT (" +
+            "  external_api_id IS NOT NULL AND external_api_id <> '' " +
+            "  AND (match_group LIKE 'Group %' " +
+            "       OR match_group IN ('Round of 32','Round of 16','Quarter-Final'," +
+            "                          'Semi-Final','Third-Place Play-off','Final'))" +
+            ")",
             nativeQuery = true)
-    int deleteTestAndPremierLeagueMatches();
+    int deleteNonWorldCupMatches();
 }
 
 

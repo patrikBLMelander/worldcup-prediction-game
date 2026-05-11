@@ -370,8 +370,8 @@ public class AdminController {
 
         log.warn("Admin cleanup-test-data starting. Keepable matches before: {}", keepCount);
 
-        int predictionsDeleted = predictionRepository.deletePredictionsForTestAndPremierLeagueMatches();
-        int matchesDeleted = matchRepository.deleteTestAndPremierLeagueMatches();
+        int predictionsDeleted = predictionRepository.deletePredictionsForNonWorldCupMatches();
+        int matchesDeleted = matchRepository.deleteNonWorldCupMatches();
         int leaguesHidden = leagueRepository.hideAllAndResetAchievementsProcessed();
 
         long userAchievementsDeleted = userAchievementRepository.count();
