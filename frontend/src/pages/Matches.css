@@ -931,6 +931,22 @@
   border: 1px solid var(--border);
 }
 
+button.match-group {
+  font-family: inherit;
+  line-height: inherit;
+}
+
+.match-group-clickable {
+  cursor: pointer;
+  transition: color var(--transition-base), border-color var(--transition-base), background var(--transition-base);
+}
+
+.match-group-clickable:hover {
+  color: var(--primary-600);
+  border-color: var(--primary-500);
+  background: var(--surface);
+}
+
 @media (max-width: 768px) {
   .match-group {
     font-size: 0.7rem;

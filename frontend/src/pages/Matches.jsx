@@ -6,6 +6,7 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import apiClient from '../config/api';
 import Navigation from '../components/Navigation';
 import CountdownTimer from '../components/CountdownTimer';
+import StandingsModal from '../components/StandingsModal';
 import { getFlagUrl } from '../utils/countryFlags';
 import './Matches.css';
 
@@ -27,6 +28,8 @@ const Matches = () => {
   const [expandedFinishedMatches, setExpandedFinishedMatches] = useState(new Set());
   const [expandedMobileMatches, setExpandedMobileMatches] = useState(new Set()); // Track expanded matches on mobile
   const [isMobile, setIsMobile] = useState(false);
+  const [standingsGroup, setStandingsGroup] = useState(null); // Selected group for standings modal
+
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(() => {
     // Initialize from URL parameter if present
@@ -573,7 +576,18 @@ const Matches = () => {
                 <div key={match.id} className={`match-card ${isFinished ? 'finished-match' : ''} ${isCollapsed ? 'collapsed' : ''} ${isMobile ? 'mobile-view' : ''} ${activeTab === 'results' ? 'results-view' : 'upcoming-view'} ${resultType ? `result-${resultType}` : ''} ${timeRemainingClass}`}>
                   <div className="match-header">
                     <div className="match-header-left">
-                      <span className={`match-group ${isMobile ? 'mobile-header-text' : 'desktop-header-text'}`}>{match.group}</span>
+                      {match.group && match.group.startsWith('Group ') ? (
+                        <button
+                          type="button"
+                          className={`match-group match-group-clickable ${isMobile ? 'mobile-header-text' : 'desktop-header-text'}`}
+                          onClick={() => setStandingsGroup(match.group)}
+                          title="View standings"
+                        >
+                          {match.group}
+                        </button>
+                      ) : (
+                        <span className={`match-group ${isMobile ? 'mobile-header-text' : 'desktop-header-text'}`}>{match.group}</span>
+                      )}
                       {/* Timer for scheduled matches, LIVE text for live matches, Points for finished matches */}
                       {match.status === 'SCHEDULED' && (
                         <div className={isMobile ? 'mobile-header-timer' : 'desktop-header-timer'}>
@@ -767,6 +781,11 @@ const Matches = () => {
         )}
       </div>
       </div>
+      <StandingsModal
+        isOpen={standingsGroup !== null}
+        onClose={() => setStandingsGroup(null)}
+        group={standingsGroup}
+      />
     </div>
   );
 };

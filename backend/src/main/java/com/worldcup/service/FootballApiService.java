@@ -50,6 +50,13 @@ public class FootballApiService {
 
     private static final DateTimeFormatter API_DATE_FORMATTER = DateTimeFormatter.ISO_DATE_TIME;
 
+    // Simple in-memory cache for standings: refresh at most once per minute
+    // to stay well under the 10 req/min free-tier limit even if many users
+    // open the standings modal in quick succession.
+    private static final long STANDINGS_CACHE_TTL_MS = 60_000L;
+    private volatile List<StandingData> cachedStandings;
+    private volatile long cachedStandingsAt;
+
     /**
      * Fetch matches for a date range
      */
@@ -121,6 +128,50 @@ public class FootballApiService {
         } catch (Exception e) {
             log.error("Error fetching matches from Football API: {}", e.getMessage(), e);
             return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Fetch group standings for the configured competition. Cached for
+     * STANDINGS_CACHE_TTL_MS so rapid modal opens hit memory, not the API.
+     */
+    public List<StandingData> fetchStandings() {
+        long now = System.currentTimeMillis();
+        List<StandingData> cached = cachedStandings;
+        if (cached != null && (now - cachedStandingsAt) < STANDINGS_CACHE_TTL_MS) {
+            return cached;
+        }
+
+        if (!apiEnabled || apiKey == null || apiKey.isEmpty()) {
+            log.warn("Football API is not enabled or API key is missing");
+            return new ArrayList<>();
+        }
+
+        try {
+            String url = baseUrl + "/competitions/" + competitionId + "/standings";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-Auth-Token", apiKey);
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+
+            log.info("Fetching standings for competition {}", competitionId);
+            ResponseEntity<StandingsResponse> response = restTemplate.exchange(
+                    url, HttpMethod.GET, entity, StandingsResponse.class);
+
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                List<StandingData> standings = response.getBody().standings;
+                cachedStandings = standings;
+                cachedStandingsAt = now;
+                log.info("Cached {} standings entries", standings.size());
+                return standings;
+            } else {
+                log.warn("Failed to fetch standings: {}", response.getStatusCode());
+                return cached != null ? cached : new ArrayList<>();
+            }
+        } catch (Exception e) {
+            log.error("Error fetching standings from Football API: {}", e.getMessage(), e);
+            // Serve stale cache on transient errors rather than empty.
+            return cached != null ? cached : new ArrayList<>();
         }
     }
 
@@ -332,6 +383,36 @@ public class FootballApiService {
     public static class ScoreDetail {
         private Integer home;
         private Integer away;
+    }
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class StandingsResponse {
+        private List<StandingData> standings = new ArrayList<>();
+    }
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class StandingData {
+        public String stage; // e.g. GROUP_STAGE
+        public String type;  // TOTAL / HOME / AWAY
+        public String group; // e.g. "Group A"
+        public List<StandingRow> table = new ArrayList<>();
+    }
+
+    @Data
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class StandingRow {
+        public Integer position;
+        public TeamData team;
+        public Integer playedGames;
+        public Integer won;
+        public Integer draw;
+        public Integer lost;
+        public Integer points;
+        public Integer goalsFor;
+        public Integer goalsAgainst;
+        public Integer goalDifference;
     }
 }
 
