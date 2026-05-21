@@ -399,6 +399,24 @@ const Matches = () => {
           <p>View all matches and make your predictions</p>
         </div>
 
+        <div className="scoring-rules" aria-label="Scoring rules">
+          <div className="scoring-rules-title">Scoring</div>
+          <div className="scoring-rules-tiers">
+            <div className="scoring-tier scoring-tier-exact">
+              <span className="scoring-tier-points">3 pts</span>
+              <span className="scoring-tier-label">Exact score</span>
+            </div>
+            <div className="scoring-tier scoring-tier-winner">
+              <span className="scoring-tier-points">1 pt</span>
+              <span className="scoring-tier-label">Correct winner or draw</span>
+            </div>
+            <div className="scoring-tier scoring-tier-wrong">
+              <span className="scoring-tier-points">0 pts</span>
+              <span className="scoring-tier-label">Wrong outcome</span>
+            </div>
+          </div>
+        </div>
+
         {/* Tab Navigation */}
         <div className="matches-tabs">
           <button

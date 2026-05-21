@@ -36,6 +36,94 @@
   font-weight: 500;
 }
 
+/* Scoring rules card */
+.scoring-rules {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  flex-wrap: wrap;
+}
+
+.scoring-rules-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.scoring-rules-tiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  flex: 1;
+}
+
+.scoring-tier {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  font-size: 0.85rem;
+}
+
+.scoring-tier-points {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.scoring-tier-label {
+  color: var(--text-secondary);
+}
+
+.scoring-tier-exact {
+  border-color: rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.08);
+}
+.scoring-tier-exact .scoring-tier-points {
+  color: rgb(22, 163, 74);
+}
+
+.scoring-tier-winner {
+  border-color: rgba(99, 102, 241, 0.4);
+  background: rgba(99, 102, 241, 0.08);
+}
+.scoring-tier-winner .scoring-tier-points {
+  color: var(--primary-600);
+}
+
+.scoring-tier-wrong {
+  opacity: 0.75;
+}
+
+@media (max-width: 600px) {
+  .scoring-rules {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacing-sm);
+    padding: var(--spacing-md);
+  }
+  .scoring-rules-tiers {
+    gap: var(--spacing-sm);
+  }
+  .scoring-tier {
+    flex: 1 1 auto;
+    justify-content: center;
+    font-size: 0.8rem;
+  }
+}
+
 /* Tab Navigation */
 .matches-tabs {
   display: flex;
