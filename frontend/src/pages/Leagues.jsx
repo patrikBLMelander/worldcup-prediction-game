@@ -23,7 +23,7 @@ const Leagues = () => {
     name: '',
     startDate: '',
     endDate: '',
-    bettingType: 'FLAT_STAKES',
+    bettingType: 'FREE',
     entryPrice: '',
     payoutStructure: 'WINNER_TAKES_ALL',
     rankedPercentages: { 1: 0.60, 2: 0.30, 3: 0.10 }
@@ -117,7 +117,9 @@ const Leagues = () => {
         name: createFormData.name.trim(),
         startDate: startDateTime,
         endDate: endDateTime,
-        bettingType: createFormData.bettingType
+        // 'FREE' is a UI-only choice; the backend treats a null bettingType as
+        // a no-entry-fee league (no stakes, ranked leaderboard only).
+        bettingType: createFormData.bettingType === 'FREE' ? null : createFormData.bettingType
       };
 
       // Add Flat Stakes fields if betting type is FLAT_STAKES
@@ -134,10 +136,10 @@ const Leagues = () => {
 
       setSuccess(`League "${response.data.name}" created successfully! Join code: ${response.data.joinCode}`);
       setCreateFormData({ 
-        name: '', 
-        startDate: '', 
+        name: '',
+        startDate: '',
         endDate: '',
-        bettingType: 'FLAT_STAKES',
+        bettingType: 'FREE',
         entryPrice: '',
         payoutStructure: 'WINNER_TAKES_ALL',
         rankedPercentages: { 1: 0.60, 2: 0.30, 3: 0.10 }
@@ -367,6 +369,14 @@ const Leagues = () => {
                 <div className="toggle-group">
                   <button
                     type="button"
+                    className={`toggle-option ${createFormData.bettingType === 'FREE' ? 'active' : ''}`}
+                    onClick={() => setCreateFormData({ ...createFormData, bettingType: 'FREE' })}
+                    disabled={createLoading}
+                  >
+                    Free
+                  </button>
+                  <button
+                    type="button"
                     className={`toggle-option ${createFormData.bettingType === 'FLAT_STAKES' ? 'active' : ''}`}
                     onClick={() => setCreateFormData({ ...createFormData, bettingType: 'FLAT_STAKES' })}
                     disabled={createLoading}
@@ -386,32 +396,36 @@ const Leagues = () => {
                   </button>
                 </div>
                 <p className="form-hint">
-                  {createFormData.bettingType === 'FLAT_STAKES' 
-                    ? 'Flat Stakes: Everyone pays the same entry price'
-                    : 'Custom Stakes: Coming soon - Each player sets their own stake'}
+                  {createFormData.bettingType === 'FREE'
+                    ? 'Free: No entry fee — play just for bragging rights'
+                    : createFormData.bettingType === 'FLAT_STAKES'
+                      ? 'Flat Stakes: Everyone pays the same entry price'
+                      : 'Custom Stakes: Coming soon - Each player sets their own stake'}
                 </p>
               </div>
 
-              {/* Entry Price (always shown - admin is part of league) */}
-              <div className="form-group">
-                <label htmlFor="entryPrice">Entry Price (SEK)</label>
-                <input
-                  type="number"
-                  id="entryPrice"
-                  min="0.01"
-                  step="0.01"
-                  value={createFormData.entryPrice}
-                  onChange={(e) => setCreateFormData({ ...createFormData, entryPrice: e.target.value })}
-                  placeholder="10.00"
-                  required
-                  disabled={createLoading}
-                />
-                <p className="form-hint">
-                  {createFormData.bettingType === 'FLAT_STAKES' 
-                    ? 'Amount each player must pay to join'
-                    : 'Your entry price (you are part of the league)'}
-                </p>
-              </div>
+              {/* Entry Price (hidden for Free leagues) */}
+              {createFormData.bettingType !== 'FREE' && (
+                <div className="form-group">
+                  <label htmlFor="entryPrice">Entry Price (SEK)</label>
+                  <input
+                    type="number"
+                    id="entryPrice"
+                    min="0.01"
+                    step="0.01"
+                    value={createFormData.entryPrice}
+                    onChange={(e) => setCreateFormData({ ...createFormData, entryPrice: e.target.value })}
+                    placeholder="10.00"
+                    required
+                    disabled={createLoading}
+                  />
+                  <p className="form-hint">
+                    {createFormData.bettingType === 'FLAT_STAKES'
+                      ? 'Amount each player must pay to join'
+                      : 'Your entry price (you are part of the league)'}
+                  </p>
+                </div>
+              )}
 
               {/* Payout Structure (only for Flat Stakes) */}
               {createFormData.bettingType === 'FLAT_STAKES' && (
