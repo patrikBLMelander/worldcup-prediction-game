@@ -1,5 +1,6 @@
 package com.worldcup.dto;
 
+import com.worldcup.entity.PredictionOutcome;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -18,12 +19,11 @@ public class FinishedPredictionDTO {
     private LocalDateTime matchDate;
     private String venue;
     private String group;
-    private Integer predictedHomeScore;
-    private Integer predictedAwayScore;
+    private PredictionOutcome predictedOutcome;
     private Integer actualHomeScore;
     private Integer actualAwayScore;
     private Integer points;
-    private String resultType; // "EXACT", "CORRECT_WINNER", "WRONG"
+    private String resultType; // "CORRECT", "WRONG"
     private String matchStatus; // "SCHEDULED", "LIVE", "FINISHED", "CANCELLED"
 }
 

@@ -1,5 +1,6 @@
 package com.worldcup.dto;
 
+import com.worldcup.entity.PredictionOutcome;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -14,12 +15,11 @@ public class PerformanceHistoryDTO {
     private String homeTeam;
     private String awayTeam;
     private LocalDateTime matchDate;
-    private Integer predictedHomeScore;
-    private Integer predictedAwayScore;
+    private PredictionOutcome predictedOutcome;
     private Integer actualHomeScore;
     private Integer actualAwayScore;
     private Integer points;
-    private String resultType; // "EXACT", "CORRECT_WINNER", "WRONG"
+    private String resultType; // "CORRECT", "WRONG"
     private Integer cumulativePoints; // Running total of points
 }
 

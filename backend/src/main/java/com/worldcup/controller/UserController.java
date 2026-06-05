@@ -12,6 +12,7 @@ import com.worldcup.dto.UserProfileDTO;
 import com.worldcup.entity.Match;
 import com.worldcup.entity.MatchStatus;
 import com.worldcup.entity.Prediction;
+import com.worldcup.entity.PredictionOutcome;
 import com.worldcup.entity.User;
 import com.worldcup.entity.Achievement;
 import com.worldcup.entity.UserAchievement;
@@ -22,11 +23,10 @@ import com.worldcup.repository.PredictionRepository;
 import com.worldcup.repository.UserAchievementRepository;
 import com.worldcup.repository.UserRepository;
 import com.worldcup.security.CurrentUser;
-import com.worldcup.service.PointsCalculationService;
 import com.worldcup.service.PredictionService;
+import com.worldcup.service.RelativeScoringService;
 import com.worldcup.service.UserService;
 
-import static com.worldcup.service.PointsCalculationService.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,7 +47,7 @@ public class UserController {
 
     private final CurrentUser currentUser;
     private final PredictionService predictionService;
-    private final PointsCalculationService pointsCalculationService;
+    private final RelativeScoringService relativeScoringService;
     private final UserRepository userRepository;
     private final PredictionRepository predictionRepository;
     private final UserService userService;
@@ -221,14 +221,15 @@ public class UserController {
                     try {
                         Match match = p.getMatch();
                         if (match == null) return false;
-                        
+                        if (p.getPredictedOutcome() == null) return false;
+
                         // CRITICAL: Only show predictions for LIVE or FINISHED matches
                         // Never show predictions for SCHEDULED matches (game hasn't started yet)
                         MatchStatus status = match.getStatus();
                         if (status != MatchStatus.FINISHED && status != MatchStatus.LIVE) {
                             return false; // Don't show predictions for SCHEDULED or CANCELLED matches
                         }
-                        
+
                         // Must have scores to show the prediction
                         boolean hasScores = match.getHomeScore() != null && match.getAwayScore() != null;
                         return hasScores;
@@ -242,42 +243,17 @@ public class UserController {
                 .map(p -> {
                     Match match = p.getMatch();
                     Integer points = p.getPoints();
-                    MatchStatus status = match.getStatus();
-                    
-                    // Only calculate and save points for FINISHED matches
-                    // For LIVE matches, only display points if already calculated (don't calculate new ones as scores can change)
-                    if (points == null && status == MatchStatus.FINISHED && match.getHomeScore() != null && match.getAwayScore() != null) {
-                        points = pointsCalculationService.calculatePoints(
-                            p.getPredictedHomeScore(),
-                            p.getPredictedAwayScore(),
-                            match.getHomeScore(),
-                            match.getAwayScore()
-                        );
-                        // Save the calculated points
-                        p.setPoints(points);
-                        predictionRepository.save(p);
+
+                    // Compute on-the-fly when not yet stored (LIVE matches, or finished
+                    // but not yet calculated). calculatePointsForMatch persists FINISHED.
+                    if (points == null) {
+                        points = predictionService.computeGlobalPoints(p);
                     }
-                    
-                    // For LIVE matches, calculate points on-the-fly for display only (don't save)
-                    if (points == null && status == MatchStatus.LIVE && match.getHomeScore() != null && match.getAwayScore() != null) {
-                        points = pointsCalculationService.calculatePoints(
-                            p.getPredictedHomeScore(),
-                            p.getPredictedAwayScore(),
-                            match.getHomeScore(),
-                            match.getAwayScore()
-                        );
-                        // Don't save - match is still LIVE, scores can change
-                    }
-                    
-                    String resultType;
-                    if (points == null || points == WRONG_PREDICTION_POINTS) {
-                        resultType = "WRONG";
-                    } else if (points == EXACT_SCORE_POINTS) {
-                        resultType = "EXACT";
-                    } else {
-                        resultType = "CORRECT_WINNER";
-                    }
-                    
+
+                    PredictionOutcome actual = relativeScoringService.actualOutcome(
+                            match.getHomeScore(), match.getAwayScore());
+                    boolean correct = p.getPredictedOutcome() == actual;
+
                     return new FinishedPredictionDTO(
                             match.getId(),
                             match.getHomeTeam(),
@@ -287,12 +263,11 @@ public class UserController {
                             match.getMatchDate(),
                             match.getVenue(),
                             match.getGroup(),
-                            p.getPredictedHomeScore(),
-                            p.getPredictedAwayScore(),
+                            p.getPredictedOutcome(),
                             match.getHomeScore(),
                             match.getAwayScore(),
                             points,
-                            resultType,
+                            correct ? "CORRECT" : "WRONG",
                             match.getStatus().name()
                     );
                 })

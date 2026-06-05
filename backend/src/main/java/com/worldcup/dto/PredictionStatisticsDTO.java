@@ -9,10 +9,9 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class PredictionStatisticsDTO {
     private int totalPredictions;
-    private int exactScores; // 3 points
-    private int correctWinners; // 1 point
-    private int wrongPredictions; // 0 points
-    private double accuracyPercentage; // Percentage of correct predictions (exact + correct winner)
-    private int totalPoints;
+    private int correctPredictions; // outcome matched the actual result
+    private int wrongPredictions;   // outcome did not match
+    private double accuracyPercentage; // correctPredictions / totalPredictions * 100
+    private int totalPoints; // global-pool points
 }
 

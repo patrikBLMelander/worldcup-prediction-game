@@ -11,6 +11,7 @@ import com.worldcup.entity.User;
 import com.worldcup.entity.Match;
 import com.worldcup.entity.MatchStatus;
 import com.worldcup.entity.Prediction;
+import com.worldcup.entity.PredictionOutcome;
 import com.worldcup.exception.InvalidBettingConfigurationException;
 import com.worldcup.exception.InvalidDateRangeException;
 import com.worldcup.exception.LeagueLockedException;
@@ -30,6 +31,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -45,7 +47,7 @@ public class LeagueService {
     private final LeagueRepository leagueRepository;
     private final LeagueMembershipRepository membershipRepository;
     private final PredictionRepository predictionRepository;
-    private final PointsCalculationService pointsCalculationService;
+    private final RelativeScoringService relativeScoringService;
     private final Optional<NotificationService> notificationService; // Optional - may not be available during startup
 
     public LeagueSummaryDTO createLeague(CreateLeagueRequest request, User owner) {
@@ -242,13 +244,15 @@ public class LeagueService {
 
         List<LeagueMembership> memberships = membershipRepository.findByLeague(league);
 
-        // Build leaderboard entries
-        List<LeaderboardEntryDTO> entries = memberships.stream()
+        List<User> members = memberships.stream()
                 .map(LeagueMembership::getUser)
                 .distinct()
-                .map(user -> buildLeagueEntryForUser(user, start, end))
-                .sorted((a, b) -> Integer.compare(b.getTotalPoints(), a.getTotalPoints()))
                 .collect(Collectors.toList());
+
+        // Build leaderboard entries with Copabet-style relative scoring, scoped to
+        // this league's members. The same prediction can be worth different points
+        // in different leagues, so points must be computed per league at read time.
+        List<LeaderboardEntryDTO> entries = computeLeagueEntries(members, start, end);
 
         // Assign ranks and calculate prizes for Flat Stakes leagues
         if (league.getBettingType() == League.BettingType.FLAT_STAKES && league.getEntryPrice() != null) {
@@ -384,65 +388,80 @@ public class LeagueService {
         }
     }
 
-    private LeaderboardEntryDTO buildLeagueEntryForUser(User user, LocalDateTime start, LocalDateTime end) {
-        List<Prediction> predictions;
-        try {
-            predictions = predictionRepository.findByUserWithMatch(user);
-        } catch (Exception e) {
-            log.warn("JOIN FETCH query failed for user {}, falling back to regular query: {}", user.getId(), e.getMessage());
-            predictions = predictionRepository.findByUser(user);
-        }
+    /**
+     * Computes relative-scoring leaderboard entries for a set of league members,
+     * scoped to matches kicking off within [start, end]. For each scorable match,
+     * points are distributed among the members who predicted it: a correct pick is
+     * worth more the fewer members got it right (see {@link RelativeScoringService}).
+     */
+    private List<LeaderboardEntryDTO> computeLeagueEntries(List<User> members, LocalDateTime start, LocalDateTime end) {
+        // Group members' scorable predictions by match.
+        Map<Long, Match> matchById = new HashMap<>();
+        Map<Long, List<Prediction>> predictionsByMatch = new HashMap<>();
 
-        int totalPoints = 0;
-        int predictionCount = 0;
-
-        for (Prediction p : predictions) {
-            Match match = p.getMatch();
-            if (match == null) continue;
-
-            LocalDateTime kickOff = match.getMatchDate();
-            if (kickOff.isBefore(start) || kickOff.isAfter(end)) continue;
-
-            // Only count LIVE/FINISHED matches with scores
-            MatchStatus status = match.getStatus();
-            if (status != MatchStatus.FINISHED && status != MatchStatus.LIVE) continue;
-            if (match.getHomeScore() == null || match.getAwayScore() == null) continue;
-
-            // Ensure points exist - only calculate and save for FINISHED matches
-            Integer points = p.getPoints();
-            if (points == null &&
-                p.getPredictedHomeScore() != null &&
-                p.getPredictedAwayScore() != null) {
-                points = pointsCalculationService.calculatePoints(
-                        p.getPredictedHomeScore(),
-                        p.getPredictedAwayScore(),
-                        match.getHomeScore(),
-                        match.getAwayScore()
-                );
-                
-                // Only save points for FINISHED matches
-                if (status == MatchStatus.FINISHED) {
-                    p.setPoints(points);
-                    predictionRepository.save(p);
-                }
-                // For LIVE matches, use points for display only (don't save)
+        for (User member : members) {
+            List<Prediction> predictions;
+            try {
+                predictions = predictionRepository.findByUserWithMatch(member);
+            } catch (Exception e) {
+                log.warn("JOIN FETCH query failed for user {}, falling back to regular query: {}", member.getId(), e.getMessage());
+                predictions = predictionRepository.findByUser(member);
             }
 
-            if (points != null) {
-                totalPoints += points;
-                predictionCount++;
+            for (Prediction p : predictions) {
+                Match match = p.getMatch();
+                if (match == null || p.getPredictedOutcome() == null) continue;
+
+                LocalDateTime kickOff = match.getMatchDate();
+                if (kickOff.isBefore(start) || kickOff.isAfter(end)) continue;
+
+                MatchStatus status = match.getStatus();
+                if (status != MatchStatus.FINISHED && status != MatchStatus.LIVE) continue;
+                if (match.getHomeScore() == null || match.getAwayScore() == null) continue;
+
+                matchById.putIfAbsent(match.getId(), match);
+                predictionsByMatch.computeIfAbsent(match.getId(), k -> new ArrayList<>()).add(p);
             }
         }
 
-        return new LeaderboardEntryDTO(
-                user.getId(),
-                user.getEmail(),
-                user.getScreenName(),
-                totalPoints,
-                predictionCount,
-                null, // prizeAmount - will be calculated later
-                null  // rank - will be assigned later
-        );
+        // Tally points per member across all scorable matches.
+        Map<Long, Integer> pointsByUser = new HashMap<>();
+        Map<Long, Integer> countByUser = new HashMap<>();
+
+        for (Map.Entry<Long, List<Prediction>> entry : predictionsByMatch.entrySet()) {
+            Match match = matchById.get(entry.getKey());
+            List<Prediction> predictions = entry.getValue();
+
+            PredictionOutcome actual = relativeScoringService.actualOutcome(
+                    match.getHomeScore(), match.getAwayScore());
+            int predictorCount = predictions.size();
+            int correctCount = (int) predictions.stream()
+                    .filter(p -> p.getPredictedOutcome() == actual)
+                    .count();
+            int gameValue = relativeScoringService.gameValue(match.getGroup());
+            int correctPoints = relativeScoringService.correctPredictionPoints(
+                    gameValue, correctCount, predictorCount);
+
+            for (Prediction p : predictions) {
+                Long uid = p.getUser().getId();
+                int pts = (p.getPredictedOutcome() == actual) ? correctPoints : 0;
+                pointsByUser.merge(uid, pts, Integer::sum);
+                countByUser.merge(uid, 1, Integer::sum);
+            }
+        }
+
+        return members.stream()
+                .map(user -> new LeaderboardEntryDTO(
+                        user.getId(),
+                        user.getEmail(),
+                        user.getScreenName(),
+                        pointsByUser.getOrDefault(user.getId(), 0),
+                        countByUser.getOrDefault(user.getId(), 0),
+                        null, // prizeAmount - will be calculated later
+                        null  // rank - will be assigned later
+                ))
+                .sorted((a, b) -> Integer.compare(b.getTotalPoints(), a.getTotalPoints()))
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)

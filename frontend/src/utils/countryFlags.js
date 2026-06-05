@@ -71,6 +71,11 @@ export const getCountryCode = (teamName) => {
   return teamToCountryCode[teamName] || 'un'; // 'un' for United Nations as fallback
 };
 
+// True when we can resolve the team name to a real country flag.
+// Used to show a neutral placeholder instead of the generic fallback flag
+// for not-yet-decided knockout slots (e.g. "Winner R16-1").
+export const hasKnownFlag = (teamName) => Boolean(teamToCountryCode[teamName]);
+
 export const getFlagUrl = (teamName, size = '80') => {
   const countryCode = getCountryCode(teamName);
   return `https://flagcdn.com/${size}x60/${countryCode}.png`;

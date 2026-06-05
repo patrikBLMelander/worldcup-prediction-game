@@ -1,5 +1,6 @@
 package com.worldcup.dto;
 
+import com.worldcup.entity.PredictionOutcome;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -8,11 +9,6 @@ public class CreatePredictionRequest {
     @NotNull(message = "Match ID is required")
     private Long matchId;
 
-    @NotNull(message = "Predicted home score is required")
-    private Integer predictedHomeScore;
-
-    @NotNull(message = "Predicted away score is required")
-    private Integer predictedAwayScore;
+    @NotNull(message = "Predicted outcome is required")
+    private PredictionOutcome predictedOutcome;
 }
-
-

@@ -27,36 +27,48 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Load user profile on mount if token exists
+  // Load user profile whenever we have a token but no loaded user yet.
+  // This is the single source of truth for fetching /users/me — login/register
+  // just set the token and let this effect resolve the profile, which avoids
+  // a race where /users/me fails inside login() while succeeding here and the
+  // user ends up authenticated *and* shown an error banner.
   useEffect(() => {
-    const loadUser = async () => {
-      if (token) {
-        try {
-          const response = await apiClient.get('/users/me');
-          setUser(response.data);
-        } catch (error) {
-          // Token might be invalid, clear it
+    if (!token) {
+      setLoading(false);
+      return;
+    }
+    if (user) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await apiClient.get('/users/me');
+        if (!cancelled) setUser(response.data);
+      } catch (error) {
+        // Only clear the token when the server actively rejects it.
+        // Network errors / 5xx are transient and shouldn't log users out.
+        const status = error.response?.status;
+        if (!cancelled && (status === 401 || status === 403)) {
           setAuthToken(null);
           setUser(null);
         }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
-    };
+    })();
 
-    loadUser();
-  }, [token]);
+    return () => {
+      cancelled = true;
+    };
+  }, [token, user]);
 
   const login = async (email, password) => {
     try {
       const response = await apiClient.post('/auth/login', { email, password });
-      const { token: newToken, userId, email: userEmail } = response.data;
-      
-      setAuthToken(newToken);
-      
-      // Fetch user profile
-      const profileResponse = await apiClient.get('/users/me');
-      setUser(profileResponse.data);
-      
+      setAuthToken(response.data.token);
       return { success: true };
     } catch (error) {
       return {
@@ -69,14 +81,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (email, password) => {
     try {
       const response = await apiClient.post('/auth/register', { email, password });
-      const { token: newToken } = response.data;
-      
-      setAuthToken(newToken);
-      
-      // Fetch user profile
-      const profileResponse = await apiClient.get('/users/me');
-      setUser(profileResponse.data);
-      
+      setAuthToken(response.data.token);
       return { success: true };
     } catch (error) {
       if (error.response?.status === 409) {

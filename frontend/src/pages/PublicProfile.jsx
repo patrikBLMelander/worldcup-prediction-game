@@ -49,9 +49,14 @@ const PublicProfile = () => {
   const getPointsColor = (points) => {
     if (points === null || points === undefined) return 'pending';
     if (points === 0) return '0';
-    if (points === 1) return '1';
-    if (points === 3) return '3';
-    return 'pending';
+    return '3'; // any positive score uses the "good" colour
+  };
+
+  const outcomeLabel = (prediction, outcome) => {
+    if (outcome === 'DRAW') return 'Draw';
+    if (outcome === 'HOME_WIN') return prediction.homeTeam;
+    if (outcome === 'AWAY_WIN') return prediction.awayTeam;
+    return '—';
   };
 
   const formatDate = (dateString) => {
@@ -135,10 +140,10 @@ const PublicProfile = () => {
                 </div>
               </div>
               <div className="stat-card-large">
-                <div className="stat-icon-large">⭐</div>
+                <div className="stat-icon-large">✓</div>
                 <div className="stat-content-large">
-                  <div className="stat-value-large">{profile.statistics.exactScores}</div>
-                  <div className="stat-label-large">Exact Scores</div>
+                  <div className="stat-value-large">{profile.statistics.correctPredictions}</div>
+                  <div className="stat-label-large">Correct Results</div>
                 </div>
               </div>
             </>
@@ -197,17 +202,10 @@ const PublicProfile = () => {
                 </div>
               </div>
               <div className="stat-card">
-                <div className="stat-icon">⭐</div>
-                <div className="stat-content">
-                  <div className="stat-value">{profile.statistics.exactScores}</div>
-                  <div className="stat-label">Exact Scores (3 pts)</div>
-                </div>
-              </div>
-              <div className="stat-card">
                 <div className="stat-icon">✓</div>
                 <div className="stat-content">
-                  <div className="stat-value">{profile.statistics.correctWinners}</div>
-                  <div className="stat-label">Correct Winners (1 pt)</div>
+                  <div className="stat-value">{profile.statistics.correctPredictions}</div>
+                  <div className="stat-label">Correct Results</div>
                 </div>
               </div>
               <div className="stat-card">
@@ -290,9 +288,9 @@ const PublicProfile = () => {
                             }
                           }} 
                         />
-                        {prediction.predictedHomeScore !== undefined && prediction.predictedAwayScore !== undefined ? (
+                        {prediction.predictedOutcome ? (
                           <span className={`prediction-result points-${pointsColor}`}>
-                            ({prediction.predictedHomeScore}-{prediction.predictedAwayScore})
+                            {outcomeLabel(prediction, prediction.predictedOutcome)}
                           </span>
                         ) : (
                           <span className="no-prediction">No prediction</span>

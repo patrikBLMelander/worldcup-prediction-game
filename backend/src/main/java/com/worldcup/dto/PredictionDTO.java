@@ -1,5 +1,7 @@
 package com.worldcup.dto;
 
+import com.worldcup.entity.PredictionOutcome;
+
 import java.time.LocalDateTime;
 
 /**
@@ -12,11 +14,8 @@ public record PredictionDTO(
     String homeTeam,
     String awayTeam,
     LocalDateTime matchDate,
-    Integer predictedHomeScore,
-    Integer predictedAwayScore,
+    PredictionOutcome predictedOutcome,
     Integer points,
     LocalDateTime createdAt,
     LocalDateTime updatedAt
 ) {}
-
-

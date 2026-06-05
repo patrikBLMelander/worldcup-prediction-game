@@ -224,17 +224,10 @@ const Profile = () => {
                     </div>
                   </div>
                   <div className="stat-card">
-                    <div className="stat-icon">⭐</div>
-                    <div className="stat-content">
-                      <div className="stat-value">{statistics.exactScores}</div>
-                      <div className="stat-label">Exact Scores (3 pts)</div>
-                    </div>
-                  </div>
-                  <div className="stat-card">
                     <div className="stat-icon">✓</div>
                     <div className="stat-content">
-                      <div className="stat-value">{statistics.correctWinners}</div>
-                      <div className="stat-label">Correct Winners (1 pt)</div>
+                      <div className="stat-value">{statistics.correctPredictions}</div>
+                      <div className="stat-label">Correct Results</div>
                     </div>
                   </div>
                   <div className="stat-card">

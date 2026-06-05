@@ -593,6 +593,196 @@
   color: var(--primary-600);
 }
 
+/* ===== Copabet-style prediction card (scheduled / live) ===== */
+.predict-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
+}
+
+.predict-teams {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--spacing-md);
+}
+
+.predict-team-name {
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.predict-team-name.home {
+  text-align: left;
+}
+
+.predict-team-name.away {
+  text-align: right;
+}
+
+/* Three equal clickable cells: [home flag] [X] [away flag] */
+.outcome-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--spacing-sm);
+  width: 100%;
+}
+
+.outcome-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+  padding: var(--spacing-sm);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-weight: 800;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
+}
+
+.outcome-cell:not(.locked):hover {
+  border-color: var(--primary-400);
+  background: var(--surface-hover, rgba(59, 130, 246, 0.06));
+}
+
+.outcome-cell:not(.locked):active {
+  transform: scale(0.97);
+}
+
+.outcome-cell.selected {
+  border-color: var(--primary-500);
+  background: rgba(59, 130, 246, 0.14);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.14);
+  color: var(--primary-500);
+}
+
+.outcome-cell.locked {
+  cursor: default;
+  opacity: 0.85;
+}
+
+/* Hexagon flag: the frame is a slightly larger hexagon that shows as a border */
+.hex-frame {
+  display: inline-flex;
+  width: 58px;
+  height: 52px;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.92);
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+  transition: transform 0.15s ease;
+}
+
+.outcome-flag {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+}
+
+/* Neutral placeholder for not-yet-decided teams (no resolvable flag) */
+.outcome-flag-unknown {
+  display: inline-block;
+  background: rgba(148, 163, 184, 0.3);
+}
+
+/* Draw cell: matching hexagon outline with an X */
+.outcome-draw-hex {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 50px;
+  transition: transform 0.15s ease;
+}
+
+.outcome-draw-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.outcome-draw-x {
+  position: relative;
+  font-weight: 800;
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+/* Subtle "alive" grow on hover */
+.outcome-cell:not(.locked):hover .hex-frame,
+.outcome-cell:not(.locked):hover .outcome-draw-hex {
+  transform: scale(1.12);
+}
+
+.predict-live-score {
+  text-align: center;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.predict-saving {
+  min-height: 1.25rem;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .outcome-cell {
+    min-height: 56px;
+  }
+  .hex-frame,
+  .outcome-draw-hex {
+    width: 50px;
+    height: 46px;
+  }
+  .predict-team-name {
+    font-size: 0.95rem;
+  }
+}
+
+/* ===== Group / stage filter pills ===== */
+.group-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.group-pill {
+  min-width: 40px;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.group-pill:hover {
+  border-color: var(--primary-400);
+  color: var(--text-primary);
+}
+
+.group-pill.active {
+  background: var(--primary-500);
+  border-color: var(--primary-500);
+  color: #fff;
+}
+
 .desktop-no-prediction {
   color: var(--text-tertiary);
   font-style: italic;

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
@@ -7,7 +7,7 @@ import apiClient from '../config/api';
 import Navigation from '../components/Navigation';
 import CountdownTimer from '../components/CountdownTimer';
 import StandingsModal from '../components/StandingsModal';
-import { getFlagUrl } from '../utils/countryFlags';
+import { getFlagUrl, hasKnownFlag } from '../utils/countryFlags';
 import './Matches.css';
 
 const Matches = () => {
@@ -36,7 +36,6 @@ const Matches = () => {
     const tabParam = searchParams.get('tab');
     return tabParam === 'results' ? 'results' : 'upcoming';
   });
-  const debounceTimers = useRef({});
 
   // Clear any notifications that belong to the Matches section when this page is viewed
   useEffect(() => {
@@ -78,14 +77,12 @@ const Matches = () => {
       
       predictions.forEach(pred => {
         predictionsMap[pred.matchId] = {
-          homeScore: pred.predictedHomeScore,
-          awayScore: pred.predictedAwayScore,
+          outcome: pred.predictedOutcome,
           points: pred.points,
         };
-        // Initialize input values with existing predictions
+        // Initialize selected outcome with existing predictions
         inputsMap[pred.matchId] = {
-          homeScore: pred.predictedHomeScore.toString(),
-          awayScore: pred.predictedAwayScore.toString(),
+          outcome: pred.predictedOutcome,
         };
         
         // Check if this prediction is for a finished match without points
@@ -215,30 +212,23 @@ const Matches = () => {
     }
   }, [matches, fetchPredictions]);
 
-  // Auto-save prediction with debouncing
-  const savePrediction = useCallback(async (matchId, homeScore, awayScore) => {
-    // Validate inputs
-    const home = parseInt(homeScore, 10);
-    const away = parseInt(awayScore, 10);
-    
-    if (isNaN(home) || isNaN(away) || home < 0 || away < 0) {
-      return; // Don't save invalid inputs
-    }
-
+  // Save an outcome pick immediately (one click = one prediction)
+  const selectOutcome = useCallback(async (matchId, outcome) => {
+    // Optimistically reflect the selection right away
+    setPredictionInputs(prev => ({ ...prev, [matchId]: { outcome } }));
     setSavingStates(prev => ({ ...prev, [matchId]: 'saving' }));
 
     try {
       await apiClient.post('/predictions', {
         matchId,
-        predictedHomeScore: home,
-        predictedAwayScore: away,
+        predictedOutcome: outcome,
       });
 
       // Refresh predictions to get updated data (including points if match is finished)
       await fetchPredictions();
 
       setSavingStates(prev => ({ ...prev, [matchId]: 'saved' }));
-      
+
       // Clear saved status after 2 seconds
       setTimeout(() => {
         setSavingStates(prev => {
@@ -250,7 +240,7 @@ const Matches = () => {
     } catch (error) {
       console.error('Failed to save prediction:', error);
       setSavingStates(prev => ({ ...prev, [matchId]: 'error' }));
-      
+
       // Clear error status after 3 seconds
       setTimeout(() => {
         setSavingStates(prev => {
@@ -262,45 +252,24 @@ const Matches = () => {
     }
   }, [fetchPredictions]);
 
-  // Handle input change with debouncing
-  const handlePredictionChange = useCallback((matchId, field, value) => {
-    // Update input state immediately using functional update
-    setPredictionInputs(prev => {
-      const updated = {
-        ...prev,
-        [matchId]: {
-          ...(prev[matchId] || {}),
-          [field]: value,
-        }
-      };
+  // Currently selected outcome for a match (pending selection or saved prediction)
+  const selectedOutcome = (matchId) =>
+    predictionInputs[matchId]?.outcome ?? userPredictions[matchId]?.outcome ?? null;
 
-      // Clear existing timer for this match
-      if (debounceTimers.current[matchId]) {
-        clearTimeout(debounceTimers.current[matchId]);
-      }
+  // Map points to an existing colour class (green for any score, red for 0)
+  const pointsClass = (points) => {
+    if (points === null || points === undefined) return 'points-pending';
+    if (points === 0) return 'points-0';
+    return 'points-3';
+  };
 
-      // Get the other field value from updated state
-      const currentInputs = updated[matchId] || {};
-      const homeScore = field === 'homeScore' ? value : (currentInputs.homeScore ?? '');
-      const awayScore = field === 'awayScore' ? value : (currentInputs.awayScore ?? '');
-
-      // Only save if both fields have valid numeric values (not empty strings)
-      // Empty string means no prediction yet, so don't save
-      if (homeScore !== '' && awayScore !== '') {
-        const home = parseInt(homeScore, 10);
-        const away = parseInt(awayScore, 10);
-        
-        if (!isNaN(home) && !isNaN(away) && home >= 0 && away >= 0) {
-          // Debounce: wait 800ms after user stops typing
-          debounceTimers.current[matchId] = setTimeout(() => {
-            savePrediction(matchId, homeScore, awayScore);
-          }, 800);
-        }
-      }
-
-      return updated;
-    });
-  }, [savePrediction]);
+  // Human label for a predicted outcome
+  const outcomeLabel = (match, outcome) => {
+    if (outcome === 'DRAW') return 'Draw';
+    if (outcome === 'HOME_WIN') return match.homeTeam;
+    if (outcome === 'AWAY_WIN') return match.awayTeam;
+    return null;
+  };
 
   useEffect(() => {
     let filtered = matches;
@@ -368,15 +337,6 @@ const Matches = () => {
     setFilteredMatches(filtered);
   }, [matches, statusFilter, groupFilter, sortBy, sortOrder, searchTerm, activeTab]);
 
-  // Cleanup timers on unmount
-  useEffect(() => {
-    return () => {
-      Object.values(debounceTimers.current).forEach(timer => {
-        if (timer) clearTimeout(timer);
-      });
-    };
-  }, []);
-
   // Get unique groups for filter
   const uniqueGroups = ['ALL', ...new Set(matches.map(m => m.group).filter(Boolean))];
 
@@ -403,16 +363,16 @@ const Matches = () => {
           <div className="scoring-rules-title">Scoring</div>
           <div className="scoring-rules-tiers">
             <div className="scoring-tier scoring-tier-exact">
-              <span className="scoring-tier-points">3 pts</span>
-              <span className="scoring-tier-label">Exact score</span>
+              <span className="scoring-tier-points">Pick the result</span>
+              <span className="scoring-tier-label">Home win, draw or away win</span>
             </div>
             <div className="scoring-tier scoring-tier-winner">
-              <span className="scoring-tier-points">1 pt</span>
-              <span className="scoring-tier-label">Correct winner or draw</span>
+              <span className="scoring-tier-points">Rarer = more</span>
+              <span className="scoring-tier-label">Alone with the right call earns the most; less as more get it right</span>
             </div>
             <div className="scoring-tier scoring-tier-wrong">
-              <span className="scoring-tier-points">0 pts</span>
-              <span className="scoring-tier-label">Wrong outcome</span>
+              <span className="scoring-tier-points">100 → 200</span>
+              <span className="scoring-tier-label">Group games worth 100, rising to 200 for the final</span>
             </div>
           </div>
         </div>
@@ -521,6 +481,22 @@ const Matches = () => {
           </div>
         </div>
 
+        {uniqueGroups.length > 1 && (
+          <div className="group-pills" role="group" aria-label="Filter by group or stage">
+            {uniqueGroups.map(g => (
+              <button
+                key={g}
+                type="button"
+                className={`group-pill ${groupFilter === g ? 'active' : ''}`}
+                onClick={() => setGroupFilter(g)}
+                title={g === 'ALL' ? 'All groups & stages' : g}
+              >
+                {g === 'ALL' ? 'All' : (g.startsWith('Group ') ? g.replace('Group ', '') : g)}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="matches-count">
           Showing {filteredMatches.length} {activeTab === 'upcoming' ? 'upcoming' : 'finished'} {filteredMatches.length === 1 ? 'match' : 'matches'}
           {filteredMatches.length !== matches.filter(m => activeTab === 'upcoming' ? (m.status === 'SCHEDULED' || m.status === 'LIVE') : m.status === 'FINISHED').length && 
@@ -545,27 +521,24 @@ const Matches = () => {
               const isExpanded = isFinished ? isExpandedDesktop : false;
               const isCollapsed = !isExpanded;
               
-              // Determine result type for finished matches
+              // Determine result type for finished matches (correct outcome vs wrong)
               let resultType = null;
               if (isFinished && prediction && match.homeScore !== null && match.awayScore !== null) {
                 const points = prediction.points;
-                if (points === 3) {
-                  resultType = 'exact';
-                } else if (points === 1) {
+                if (points === null || points === undefined) {
+                  resultType = null;
+                } else if (points > 0) {
                   resultType = 'correct-winner';
-                } else if (points === 0 || points === null) {
+                } else {
                   resultType = 'wrong';
                 }
               }
-
-              // Check if prediction has a winner (points > 0) - only for finished matches
-              const hasWinner = isFinished && prediction && prediction.points !== null && prediction.points !== undefined && prediction.points > 0;
 
               // Calculate time remaining for scheduled matches (for color coding)
               let timeRemainingClass = '';
               if (match.status === 'SCHEDULED' && match.matchDate) {
                 // Check if already predicted
-                const hasPrediction = prediction && prediction.homeScore !== undefined && prediction.awayScore !== undefined;
+                const hasPrediction = !!selectedOutcome(match.id);
                 
                 if (hasPrediction) {
                   timeRemainingClass = 'time-predicted'; // Green for already predicted
@@ -625,7 +598,7 @@ const Matches = () => {
                       {isFinished && prediction && (
                         <div className={isMobile ? 'mobile-header-points' : 'desktop-header-points'}>
                           {prediction.points !== null && prediction.points !== undefined ? (
-                            <span className={`header-points-badge points-${prediction.points}`}>
+                            <span className={`header-points-badge ${pointsClass(prediction.points)}`}>
                               {prediction.points === 1 ? '1 pt' : `${prediction.points} pts`}
                             </span>
                           ) : (
@@ -636,116 +609,108 @@ const Matches = () => {
                     </div>
                   </div>
                   
-                  {/* Compact centered layout for all matches */}
-                  <div className={`match-compact ${isMobile ? 'mobile-match-compact' : 'desktop-match-compact'}`}>
-                    <div className={`compact-row ${isMobile ? 'mobile-compact-row' : 'desktop-compact-row'}`}>
-                      {isFinished ? (
-                        // Finished match: [Logo] Team1 [Score1] vs [Score2] Team2 [Logo] [Prediction]
-                        <>
-                          <img src={homeLogoUrl} alt={match.homeTeam} className={isMobile ? 'mobile-team-logo' : 'desktop-team-logo'} onError={(e) => {
-                            if (match.homeTeamCrest) {
-                              e.target.src = getFlagUrl(match.homeTeam);
-                            }
-                          }} />
-                          <span className={isMobile ? 'mobile-team-name' : 'desktop-team-name'}>{match.homeTeam}</span>
-                          {match.homeScore !== null && match.awayScore !== null && (
-                            <span className={isMobile ? 'mobile-score' : 'desktop-score'}>{match.homeScore}</span>
-                          )}
-                          <span className={isMobile ? 'mobile-vs' : 'desktop-vs'}>vs</span>
-                          {match.homeScore !== null && match.awayScore !== null && (
-                            <span className={isMobile ? 'mobile-score' : 'desktop-score'}>{match.awayScore}</span>
-                          )}
-                          <span className={isMobile ? 'mobile-team-name' : 'desktop-team-name'}>{match.awayTeam}</span>
-                          <img src={awayLogoUrl} alt={match.awayTeam} className={isMobile ? 'mobile-team-logo' : 'desktop-team-logo'} onError={(e) => {
-                            if (match.awayTeamCrest) {
-                              e.target.src = getFlagUrl(match.awayTeam);
-                            }
-                          }} />
-                          {prediction && prediction.homeScore !== undefined && prediction.awayScore !== undefined ? (
-                            <span className={`${isMobile ? 'mobile-prediction-result' : 'desktop-prediction-result'} ${prediction.points !== null && prediction.points !== undefined ? `points-${prediction.points}` : 'points-pending'}`}>
-                              ({prediction.homeScore}-{prediction.awayScore})
-                            </span>
-                          ) : (
-                            <span className={isMobile ? 'mobile-no-prediction' : 'desktop-no-prediction'}>No prediction</span>
-                          )}
-                        </>
-                      ) : (
-                        // Scheduled matches or desktop: original layout
-                        <>
-                          <div className={isMobile ? 'mobile-team' : 'desktop-team'}>
-                            <img src={homeLogoUrl} alt={match.homeTeam} className={isMobile ? 'mobile-team-logo' : 'desktop-team-logo'} onError={(e) => {
-                              if (match.homeTeamCrest) {
-                                e.target.src = getFlagUrl(match.homeTeam);
-                              }
-                            }} />
-                            <span className={isMobile ? 'mobile-team-name' : 'desktop-team-name'}>{match.homeTeam}</span>
-                          </div>
-                          {match.status === 'SCHEDULED' ? (
-                            <>
-                              <input
-                                type="number"
-                                min="0"
-                                max="20"
-                                className={isMobile ? 'mobile-prediction-input' : 'desktop-prediction-input'}
-                                value={predictionInputs[match.id]?.homeScore ?? ''}
-                                onChange={(e) => handlePredictionChange(match.id, 'homeScore', e.target.value)}
-                                placeholder="-"
-                              />
-                              <span className={isMobile ? 'mobile-vs' : 'desktop-vs'}>-</span>
-                              <input
-                                type="number"
-                                min="0"
-                                max="20"
-                                className={isMobile ? 'mobile-prediction-input' : 'desktop-prediction-input'}
-                                value={predictionInputs[match.id]?.awayScore ?? ''}
-                                onChange={(e) => handlePredictionChange(match.id, 'awayScore', e.target.value)}
-                                placeholder="-"
-                              />
-                            </>
-                          ) : (
-                            <>
-                              <span className={isMobile ? 'mobile-vs' : 'desktop-vs'}>vs</span>
-                              {(match.status === 'FINISHED' || match.status === 'LIVE') && match.homeScore !== null && match.awayScore !== null && (
-                                <span className={isMobile ? 'mobile-score' : 'desktop-score'}>{match.homeScore} - {match.awayScore}</span>
-                              )}
-                            </>
-                          )}
-                          <div className={isMobile ? 'mobile-team' : 'desktop-team'}>
-                            <img src={awayLogoUrl} alt={match.awayTeam} className={isMobile ? 'mobile-team-logo' : 'desktop-team-logo'} onError={(e) => {
-                              if (match.awayTeamCrest) {
-                                e.target.src = getFlagUrl(match.awayTeam);
-                              }
-                            }} />
-                            <span className={isMobile ? 'mobile-team-name' : 'desktop-team-name'}>{match.awayTeam}</span>
-                          </div>
-                          {match.status !== 'SCHEDULED' && (
-                            prediction && prediction.homeScore !== undefined && prediction.awayScore !== undefined ? (
-                              <span className={`${isMobile ? 'mobile-prediction' : 'desktop-prediction'} ${hasWinner ? 'has-winner' : ''}`}>
-                                ({prediction.homeScore}-{prediction.awayScore})
-                              </span>
-                            ) : (
-                              <span className={isMobile ? 'mobile-no-prediction' : 'desktop-no-prediction'}>No prediction</span>
-                            )
-                          )}
-                        </>
-                      )}
-                    </div>
-                    
-                    {/* Prediction status for scheduled matches */}
-                    {match.status === 'SCHEDULED' && (
-                      <div className={isMobile ? 'mobile-match-actions' : 'desktop-match-actions'}>
-                        {savingStates[match.id] === 'saving' && (
-                          <span className="prediction-status saving">💾 Saving...</span>
+                  {isFinished ? (
+                    /* Finished match: compact result row with the user's pick */
+                    <div className={`match-compact ${isMobile ? 'mobile-match-compact' : 'desktop-match-compact'}`}>
+                      <div className={`compact-row ${isMobile ? 'mobile-compact-row' : 'desktop-compact-row'}`}>
+                        <img src={homeLogoUrl} alt={match.homeTeam} className={isMobile ? 'mobile-team-logo' : 'desktop-team-logo'} onError={(e) => {
+                          if (match.homeTeamCrest) {
+                            e.target.src = getFlagUrl(match.homeTeam);
+                          }
+                        }} />
+                        <span className={isMobile ? 'mobile-team-name' : 'desktop-team-name'}>{match.homeTeam}</span>
+                        {match.homeScore !== null && match.awayScore !== null && (
+                          <span className={isMobile ? 'mobile-score' : 'desktop-score'}>{match.homeScore}</span>
                         )}
-                        {savingStates[match.id] === 'saved' && (
-                          <span className="prediction-status saved">✓ Saved</span>
+                        <span className={isMobile ? 'mobile-vs' : 'desktop-vs'}>vs</span>
+                        {match.homeScore !== null && match.awayScore !== null && (
+                          <span className={isMobile ? 'mobile-score' : 'desktop-score'}>{match.awayScore}</span>
                         )}
-                        {savingStates[match.id] === 'error' && (
-                          <span className="prediction-status error">✗ Error saving</span>
+                        <span className={isMobile ? 'mobile-team-name' : 'desktop-team-name'}>{match.awayTeam}</span>
+                        <img src={awayLogoUrl} alt={match.awayTeam} className={isMobile ? 'mobile-team-logo' : 'desktop-team-logo'} onError={(e) => {
+                          if (match.awayTeamCrest) {
+                            e.target.src = getFlagUrl(match.awayTeam);
+                          }
+                        }} />
+                        {prediction && prediction.outcome ? (
+                          <span className={`${isMobile ? 'mobile-prediction-result' : 'desktop-prediction-result'} ${pointsClass(prediction.points)}`}>
+                            {outcomeLabel(match, prediction.outcome)}
+                          </span>
+                        ) : (
+                          <span className={isMobile ? 'mobile-no-prediction' : 'desktop-no-prediction'}>No prediction</span>
                         )}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    /* Scheduled / Live: Copabet-style pick layout (names on top, 3 big cells) */
+                    <div className="predict-body">
+                      <div className="predict-teams">
+                        <span className="predict-team-name home">{match.homeTeam}</span>
+                        <span className="predict-team-name away">{match.awayTeam}</span>
+                      </div>
+                      {(() => {
+                        const locked = match.status !== 'SCHEDULED';
+                        const sel = selectedOutcome(match.id);
+                        const cell = (outcome, content, label) => (
+                          <button
+                            type="button"
+                            className={`outcome-cell ${outcome === 'DRAW' ? 'outcome-draw' : ''} ${sel === outcome ? 'selected' : ''} ${locked ? 'locked' : ''}`}
+                            onClick={locked ? undefined : () => selectOutcome(match.id, outcome)}
+                            disabled={locked}
+                            title={label}
+                            aria-label={label}
+                          >
+                            {content}
+                          </button>
+                        );
+                        const flag = (crest, team) => {
+                          // No crest from the feed and no known country -> neutral placeholder box
+                          if (!crest && !hasKnownFlag(team)) {
+                            return <span className="hex-frame"><span className="outcome-flag outcome-flag-unknown" aria-hidden="true" /></span>;
+                          }
+                          const url = crest || getFlagUrl(team);
+                          return (
+                            <span className="hex-frame">
+                              <img src={url} alt="" className="outcome-flag" onError={(e) => { if (crest) e.target.src = getFlagUrl(team); }} />
+                            </span>
+                          );
+                        };
+                        const drawHex = (
+                          <span className="outcome-draw-hex">
+                            <svg className="outcome-draw-svg" viewBox="0 0 56 56" aria-hidden="true">
+                              <polygon points="15,3 41,3 54,28 41,53 15,53 2,28" fill="none" stroke="currentColor" strokeWidth="3" strokeLinejoin="round" />
+                            </svg>
+                            <span className="outcome-draw-x">X</span>
+                          </span>
+                        );
+                        return (
+                          <div className="outcome-picker" role="group" aria-label="Pick the result">
+                            {cell('HOME_WIN', flag(match.homeTeamCrest, match.homeTeam), `${match.homeTeam} win`)}
+                            {cell('DRAW', drawHex, 'Draw')}
+                            {cell('AWAY_WIN', flag(match.awayTeamCrest, match.awayTeam), `${match.awayTeam} win`)}
+                          </div>
+                        );
+                      })()}
+                      {match.status === 'LIVE' && match.homeScore !== null && match.awayScore !== null && (
+                        <div className="predict-live-score">
+                          <span className="live-indicator">LIVE</span> {match.homeScore} - {match.awayScore}
+                        </div>
+                      )}
+                      {match.status === 'SCHEDULED' && (
+                        <div className="predict-saving">
+                          {savingStates[match.id] === 'saving' && (
+                            <span className="prediction-status saving">💾 Saving...</span>
+                          )}
+                          {savingStates[match.id] === 'saved' && (
+                            <span className="prediction-status saved">✓ Saved</span>
+                          )}
+                          {savingStates[match.id] === 'error' && (
+                            <span className="prediction-status error">✗ Error saving</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {/* Results summary for finished matches - only show when expanded on desktop */}
                   {!isMobile && match.status === 'FINISHED' && isExpanded && (
@@ -754,8 +719,8 @@ const Matches = () => {
                         <div className="result-row">
                           <span className="result-label">Your Prediction</span>
                           <span className="result-prediction-score">
-                            {userPredictions[match.id] 
-                              ? `${userPredictions[match.id].homeScore} - ${userPredictions[match.id].awayScore}`
+                            {userPredictions[match.id]?.outcome
+                              ? outcomeLabel(match, userPredictions[match.id].outcome)
                               : 'No prediction'}
                           </span>
                         </div>
@@ -769,7 +734,7 @@ const Matches = () => {
                       {userPredictions[match.id] && (
                         <div className="points-display">
                           <span className="points-label">Points Earned</span>
-                          <span className={`points-badge ${userPredictions[match.id].points !== null && userPredictions[match.id].points !== undefined ? `points-${userPredictions[match.id].points}` : 'points-pending'}`}>
+                          <span className={`points-badge ${pointsClass(userPredictions[match.id].points)}`}>
                             {userPredictions[match.id].points !== null && userPredictions[match.id].points !== undefined
                               ? `${userPredictions[match.id].points} ${userPredictions[match.id].points === 1 ? 'point' : 'points'}`
                               : (

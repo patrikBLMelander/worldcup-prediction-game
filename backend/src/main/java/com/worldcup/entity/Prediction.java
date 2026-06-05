@@ -33,14 +33,27 @@ public class Prediction {
     @JoinColumn(name = "match_id", nullable = false)
     private Match match;
 
-    @NotNull
-    @Column(nullable = false)
+    /**
+     * The predicted match outcome (Copabet-style). This is the source of truth
+     * for scoring. May be null only for legacy rows pending backfill.
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "predicted_outcome", length = 20)
+    private PredictionOutcome predictedOutcome;
+
+    // Legacy exact-score fields. No longer collected from users; kept nullable
+    // so historical rows remain readable and the outcome can be derived from them.
+    @Column
     private Integer predictedHomeScore;
 
-    @NotNull
-    @Column(nullable = false)
+    @Column
     private Integer predictedAwayScore;
 
+    /**
+     * Points for this prediction in the GLOBAL pool (all players who predicted
+     * this match). Stable once the match finishes because predictions are locked
+     * at kickoff. Per-league points are computed separately at read time.
+     */
     @Column
     private Integer points; // Calculated after match finishes
 

@@ -34,8 +34,7 @@ public class PredictionController {
         Prediction prediction = predictionService.createOrUpdatePrediction(
                 user,
                 request.getMatchId(),
-                request.getPredictedHomeScore(),
-                request.getPredictedAwayScore()
+                request.getPredictedOutcome()
         );
 
         // Check for achievements after prediction is made
@@ -73,8 +72,7 @@ public class PredictionController {
                 match.getHomeTeam(),
                 match.getAwayTeam(),
                 match.getMatchDate(),
-                prediction.getPredictedHomeScore(),
-                prediction.getPredictedAwayScore(),
+                prediction.getPredictedOutcome(),
                 prediction.getPoints(),
                 prediction.getCreatedAt(),
                 prediction.getUpdatedAt()
