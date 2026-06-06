@@ -24,8 +24,9 @@ code {
   position: relative;
 }
 
-/* Ensure content is above animated background */
-#root > *:not(.animated-background) {
+/* Ensure content is above animated background.
+   Exclude the chat widget so it keeps its own fixed positioning + z-index. */
+#root > *:not(.animated-background):not(.chat-widget) {
   position: relative;
   z-index: 1;
 }

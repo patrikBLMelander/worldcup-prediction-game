@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AnimatedBackground from './components/AnimatedBackground';
+import ChatWidget from './components/ChatWidget';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Invite from './pages/Invite';
@@ -112,11 +113,12 @@ function App() {
         />
 
         {/* Default redirect */}
-        <Route 
-          path="/" 
-          element={<Navigate to={shouldRedirect ? "/dashboard" : "/login"} replace />} 
+        <Route
+          path="/"
+          element={<Navigate to={shouldRedirect ? "/dashboard" : "/login"} replace />}
         />
       </Routes>
+      {isAuthenticated && <ChatWidget />}
     </>
   );
 }
