@@ -119,19 +119,20 @@ public class LeagueService {
 
             log.debug("Found league: {}, startDate: {}, endDate: {}", league.getId(), league.getStartDate(), league.getEndDate());
 
+            // Existing members are always let through idempotently, even after the
+            // join deadline — the lock only applies to brand-new members.
+            Optional<LeagueMembership> existing = membershipRepository.findByLeagueAndUser(league, user);
+            if (existing.isPresent()) {
+                return toSummary(league); // Idempotent join
+            }
+
             LocalDateTime now = LocalDateTime.now();
             log.debug("Current time: {}, League start date: {}, isBefore: {}", now, league.getStartDate(), now.isBefore(league.getStartDate()));
-            
+
             // Disallow joining after league window has started (join deadline)
             if (!now.isBefore(league.getStartDate())) {
                 log.warn("User {} attempted to join league {} which has already started", user.getId(), league.getId());
                 throw new LeagueLockedException(league.getId());
-            }
-
-            // Ensure user is not already a member
-            Optional<LeagueMembership> existing = membershipRepository.findByLeagueAndUser(league, user);
-            if (existing.isPresent()) {
-                return toSummary(league); // Idempotent join
             }
 
             // Fetch existing members BEFORE saving new membership (for notifications)

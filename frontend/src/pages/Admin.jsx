@@ -25,6 +25,8 @@ const Admin = () => {
 
   // Users state
   const [users, setUsers] = useState([]);
+  const [resetPasswordInfo, setResetPasswordInfo] = useState(null); // { email, temporaryPassword }
+  const [copied, setCopied] = useState(false);
 
   // Overview state
   const [stats, setStats] = useState({
@@ -159,6 +161,32 @@ const Admin = () => {
       fetchData();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to update user role');
+    }
+  };
+
+  const handleResetPassword = async (userId, email) => {
+    if (!window.confirm(`Reset the password for ${email}? They will need the new temporary password to log in.`)) {
+      return;
+    }
+    setError('');
+    setSuccess('');
+    try {
+      const response = await apiClient.post(`/admin/users/${userId}/reset-password`);
+      setResetPasswordInfo(response.data);
+      setCopied(false);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to reset password');
+    }
+  };
+
+  const handleCopyPassword = async () => {
+    if (!resetPasswordInfo?.temporaryPassword) return;
+    try {
+      await navigator.clipboard.writeText(resetPasswordInfo.temporaryPassword);
+      setCopied(true);
+    } catch {
+      // Clipboard API unavailable (e.g. non-HTTPS) — user can still copy manually.
+      setCopied(false);
     }
   };
 
@@ -455,6 +483,7 @@ const Admin = () => {
                       user={user}
                       onUpdateRole={handleUpdateUserRole}
                       onUpdateEnabled={handleUpdateUserEnabled}
+                      onResetPassword={handleResetPassword}
                     />
                   ))}
                 </tbody>
@@ -463,6 +492,28 @@ const Admin = () => {
           </div>
         )}
       </div>
+
+      {resetPasswordInfo && (
+        <div className="match-form-modal" onClick={() => setResetPasswordInfo(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Temporary Password</h2>
+              <p>Share this with <strong>{resetPasswordInfo.email}</strong>. Ask them to change it after logging in. It won't be shown again.</p>
+            </div>
+            <div className="temp-password-box">
+              <code>{resetPasswordInfo.temporaryPassword}</code>
+              <button onClick={handleCopyPassword} className="btn-small">
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+            <div className="form-actions">
+              <button onClick={() => setResetPasswordInfo(null)} className="btn-small btn-secondary">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -593,7 +644,7 @@ const MatchRow = ({ match, onUpdateResult, onUpdateStatus, onDelete, onRecalcula
   );
 };
 
-const UserRow = ({ user, onUpdateRole, onUpdateEnabled }) => {
+const UserRow = ({ user, onUpdateRole, onUpdateEnabled, onResetPassword }) => {
   return (
     <tr>
       <td>{user.email}</td>
@@ -617,7 +668,14 @@ const UserRow = ({ user, onUpdateRole, onUpdateEnabled }) => {
         </select>
       </td>
       <td>{new Date(user.createdAt).toLocaleDateString()}</td>
-      <td>-</td>
+      <td>
+        <button
+          onClick={() => onResetPassword(user.id, user.email)}
+          className="btn-small btn-secondary"
+        >
+          Reset Password
+        </button>
+      </td>
     </tr>
   );
 };

@@ -23,6 +23,7 @@ import com.worldcup.entity.Notification;
 import com.worldcup.service.MatchService;
 import com.worldcup.service.NotificationService;
 import com.worldcup.service.PredictionService;
+import com.worldcup.service.UserService;
 import com.worldcup.service.WebSocketService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -46,6 +47,7 @@ public class AdminController {
 
     private final MatchService matchService;
     private final UserRepository userRepository;
+    private final UserService userService;
     private final PredictionService predictionService;
     private final WebSocketService webSocketService;
     private final FootballApiSyncScheduler footballApiSyncScheduler;
@@ -99,6 +101,19 @@ public class AdminController {
         user.setEnabled(enabled);
         userRepository.save(user);
         return ResponseEntity.ok().body(java.util.Map.of("message", "User enabled status updated successfully"));
+    }
+
+    @PostMapping("/users/{id}/reset-password")
+    @Transactional
+    public ResponseEntity<?> resetUserPassword(@PathVariable Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException(id));
+        String temporaryPassword = userService.adminResetPassword(id);
+        log.warn("Admin reset password for user {} ({})", user.getId(), user.getEmail());
+        return ResponseEntity.ok().body(java.util.Map.of(
+                "email", user.getEmail(),
+                "temporaryPassword", temporaryPassword
+        ));
     }
 
     @PostMapping("/matches")
