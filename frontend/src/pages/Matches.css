@@ -1076,7 +1076,7 @@
 }
 
 .match-card.results-view.result-correct-winner {
-  border-left-color: #eab308;
+  border-left-color: #22c55e;
 }
 
 .match-card.results-view.result-correct-winner::after {
@@ -1086,7 +1086,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(to right, rgba(234, 179, 8, 0.08) 0%, rgba(234, 179, 8, 0.02) 30%, transparent 100%);
+  background: linear-gradient(to right, rgba(34, 197, 94, 0.08) 0%, rgba(34, 197, 94, 0.02) 30%, transparent 100%);
   pointer-events: none;
   border-radius: var(--radius-xl);
   z-index: 0;
@@ -1140,9 +1140,9 @@
 }
 
 .result-type-badge.result-type-correct-winner {
-  background: linear-gradient(135deg, rgba(234, 179, 8, 0.2) 0%, rgba(234, 179, 8, 0.3) 100%);
-  color: #eab308;
-  border: 2px solid rgba(234, 179, 8, 0.4);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.2) 0%, rgba(34, 197, 94, 0.3) 100%);
+  color: #22c55e;
+  border: 2px solid rgba(34, 197, 94, 0.4);
 }
 
 .result-type-badge.result-type-wrong {
