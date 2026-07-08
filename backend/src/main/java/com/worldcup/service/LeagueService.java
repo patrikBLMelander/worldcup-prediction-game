@@ -5,6 +5,7 @@ import com.worldcup.dto.LeagueSummaryDTO;
 import com.worldcup.dto.LeagueMemberDTO;
 import com.worldcup.dto.LeaderboardEntryDTO;
 import com.worldcup.dto.LeaguePredictionSplitDTO;
+import com.worldcup.dto.LeagueScoreTimelineDTO;
 import com.worldcup.exception.MatchNotFoundException;
 import com.worldcup.entity.League;
 import com.worldcup.entity.LeagueMembership;
@@ -649,6 +650,104 @@ public class LeagueService {
             return email.substring(0, email.indexOf('@'));
         }
         return email != null ? email : ("User " + user.getId());
+    }
+
+    /**
+     * Cumulative league-relative points for every member, one point per scored
+     * match in chronological order. Mirrors the leaderboard's scoring but broken
+     * out and accumulated per match, so the final values match the leaderboard.
+     */
+    @Transactional(readOnly = true)
+    public LeagueScoreTimelineDTO getScoreTimeline(Long leagueId, User requester) {
+        League league = requireVisibleLeague(leagueId);
+        requireMember(league, requester);
+
+        LocalDateTime start = league.getStartDate();
+        LocalDateTime end = league.getEndDate();
+
+        // Stable member order → stable colour per member on the chart.
+        List<User> members = membershipRepository.findByLeague(league).stream()
+                .map(LeagueMembership::getUser)
+                .filter(u -> u != null)
+                .collect(Collectors.toMap(User::getId, u -> u, (a, b) -> a)) // de-dup by id
+                .values().stream()
+                .sorted((a, b) -> Long.compare(a.getId(), b.getId()))
+                .collect(Collectors.toList());
+
+        // Gather members' scorable predictions, grouped by match.
+        Map<Long, Match> matchById = new HashMap<>();
+        Map<Long, List<Prediction>> predictionsByMatch = new HashMap<>();
+        for (User member : members) {
+            List<Prediction> predictions;
+            try {
+                predictions = predictionRepository.findByUserWithMatch(member);
+            } catch (Exception e) {
+                predictions = predictionRepository.findByUser(member);
+            }
+            for (Prediction p : predictions) {
+                Match match = p.getMatch();
+                if (match == null || p.getPredictedOutcome() == null) continue;
+                MatchStatus status = match.getStatus();
+                if (status != MatchStatus.FINISHED && status != MatchStatus.LIVE) continue;
+                if (match.getHomeScore() == null || match.getAwayScore() == null) continue;
+                LocalDateTime kickOff = match.getMatchDate();
+                if (kickOff.isBefore(start) || kickOff.isAfter(end)) continue;
+
+                matchById.putIfAbsent(match.getId(), match);
+                predictionsByMatch.computeIfAbsent(match.getId(), k -> new ArrayList<>()).add(p);
+            }
+        }
+
+        List<Match> orderedMatches = matchById.values().stream()
+                .sorted((a, b) -> a.getMatchDate().compareTo(b.getMatchDate())) // chronological
+                .collect(Collectors.toList());
+
+        // Walk matches in order, accumulating each member's running total.
+        Map<Long, Integer> running = new HashMap<>();
+        List<LeagueScoreTimelineDTO.TimelinePoint> points = new ArrayList<>();
+
+        for (Match match : orderedMatches) {
+            List<Prediction> predictions = predictionsByMatch.get(match.getId());
+            PredictionOutcome actual = relativeScoringService.actualOutcome(
+                    match.getHomeScore(), match.getAwayScore());
+            int predictorCount = predictions.size();
+            int correctCount = (int) predictions.stream()
+                    .filter(p -> p.getPredictedOutcome() == actual)
+                    .count();
+            int gameValue = relativeScoringService.gameValue(match.getGroup());
+            int correctPoints = relativeScoringService.correctPredictionPoints(
+                    gameValue, correctCount, predictorCount);
+
+            for (Prediction p : predictions) {
+                int pts = (p.getPredictedOutcome() == actual) ? correctPoints : 0;
+                running.merge(p.getUser().getId(), pts, Integer::sum);
+            }
+
+            // Snapshot every member's running total (default 0) after this match.
+            Map<String, Integer> snapshot = new HashMap<>();
+            for (User m : members) {
+                snapshot.put(String.valueOf(m.getId()), running.getOrDefault(m.getId(), 0));
+            }
+            points.add(new LeagueScoreTimelineDTO.TimelinePoint(
+                    match.getId(), matchLabel(match), match.getMatchDate(), snapshot));
+        }
+
+        List<LeagueScoreTimelineDTO.Member> memberDtos = members.stream()
+                .map(u -> new LeagueScoreTimelineDTO.Member(u.getId(), displayName(u)))
+                .collect(Collectors.toList());
+
+        return new LeagueScoreTimelineDTO(memberDtos, points);
+    }
+
+    /** Short match label for a chart axis, e.g. "BEL–SEN". */
+    private String matchLabel(Match match) {
+        return abbreviate(match.getHomeTeam()) + "–" + abbreviate(match.getAwayTeam());
+    }
+
+    private String abbreviate(String team) {
+        if (team == null || team.isBlank()) return "?";
+        String cleaned = team.trim();
+        return cleaned.substring(0, Math.min(3, cleaned.length())).toUpperCase();
     }
 
     private League requireVisibleLeague(Long leagueId) {

@@ -765,3 +765,19 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }
 }
+
+/* ---- Points-over-time chart (under the live section) ---- */
+.lb-timeline {
+  margin-top: 28px;
+}
+
+.lb-timeline-title {
+  font-size: 1.1rem;
+  margin: 0 0 2px;
+}
+
+.lb-timeline-subtitle {
+  font-size: 0.82rem;
+  color: var(--text-secondary, #94a3b8);
+  margin: 0 0 12px;
+}

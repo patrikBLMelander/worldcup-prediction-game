@@ -6,6 +6,7 @@ import { useNotifications } from '../context/NotificationContext';
 import apiClient from '../config/api';
 import Navigation from '../components/Navigation';
 import PredictionSplitBar from '../components/PredictionSplitBar';
+import LeagueScoreChart from '../components/LeagueScoreChart';
 import { formatCurrency } from '../utils/currency';
 import './Leaderboard.css';
 
@@ -27,6 +28,9 @@ const Leaderboard = () => {
   const [splitsLoading, setSplitsLoading] = useState(false);
   // Live matches' splits, shown under the leaderboard table when a league is selected.
   const [liveSplits, setLiveSplits] = useState([]);
+  // Cumulative score-over-time data for the "Over time" chart view.
+  const [timeline, setTimeline] = useState(null);
+  const [timelineLoading, setTimelineLoading] = useState(false);
 
   // Clear any notifications that belong to the Leaderboard section when this page is viewed
   useEffect(() => {
@@ -108,7 +112,28 @@ const Leaderboard = () => {
     fetchSplits();
   }, [view, selectedLeagueId]);
 
-  // The Predictions view only applies to a specific league; reset when leaving one.
+  // Fetch the score-over-time data for the chart under the leaderboard.
+  useEffect(() => {
+    const fetchTimeline = async () => {
+      if (!selectedLeagueId) {
+        setTimeline(null);
+        return;
+      }
+      try {
+        setTimelineLoading(true);
+        const res = await apiClient.get(`/leagues/${selectedLeagueId}/score-timeline`);
+        setTimeline(res.data);
+      } catch (error) {
+        console.error('Failed to fetch score timeline:', error);
+        setTimeline(null);
+      } finally {
+        setTimelineLoading(false);
+      }
+    };
+    fetchTimeline();
+  }, [selectedLeagueId]);
+
+  // The Predictions / Over time views only apply to a specific league; reset when leaving one.
   useEffect(() => {
     if (!selectedLeagueId && view !== 'leaderboard') {
       setView('leaderboard');
@@ -384,6 +409,14 @@ const Leaderboard = () => {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {timeline && timeline.points && timeline.points.length > 0 && (
+          <div className="lb-timeline">
+            <h2 className="lb-timeline-title">📈 Points over time</h2>
+            <p className="lb-timeline-subtitle">Cumulative league points after each match.</p>
+            <LeagueScoreChart timeline={timeline} currentUserId={user?.id} />
           </div>
         )}
         </>

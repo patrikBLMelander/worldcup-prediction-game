@@ -6,6 +6,7 @@ import com.worldcup.dto.LeagueSummaryDTO;
 import com.worldcup.dto.LeagueMemberDTO;
 import com.worldcup.dto.LeaderboardEntryDTO;
 import com.worldcup.dto.LeaguePredictionSplitDTO;
+import com.worldcup.dto.LeagueScoreTimelineDTO;
 import com.worldcup.entity.MatchStatus;
 import com.worldcup.entity.User;
 import com.worldcup.security.CurrentUser;
@@ -82,6 +83,16 @@ public class LeagueController {
             @RequestParam(required = false) MatchStatus status) {
         User user = currentUser.getCurrentUserOrThrow();
         return ResponseEntity.ok(leagueService.getLockedMatchPredictionSplits(leagueId, user, status));
+    }
+
+    /**
+     * Cumulative points over time for every league member (one point per scored
+     * match). Powers the leaderboard's "Over time" line chart.
+     */
+    @GetMapping("/{leagueId}/score-timeline")
+    public ResponseEntity<LeagueScoreTimelineDTO> getScoreTimeline(@PathVariable Long leagueId) {
+        User user = currentUser.getCurrentUserOrThrow();
+        return ResponseEntity.ok(leagueService.getScoreTimeline(leagueId, user));
     }
 
     @PostMapping("/{leagueId}/hide")
