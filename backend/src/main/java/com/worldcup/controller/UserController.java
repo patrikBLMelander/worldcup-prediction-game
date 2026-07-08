@@ -175,19 +175,7 @@ public class UserController {
         
         // Convert to DTOs
         List<com.worldcup.dto.MatchDTO> matchDTOs = matchesWithoutPrediction.stream()
-            .map(match -> new com.worldcup.dto.MatchDTO(
-                match.getId(),
-                match.getHomeTeam(),
-                match.getHomeTeamCrest(),
-                match.getAwayTeam(),
-                match.getAwayTeamCrest(),
-                match.getMatchDate(),
-                match.getVenue(),
-                match.getGroup(),
-                match.getStatus(),
-                match.getHomeScore(),
-                match.getAwayScore()
-            ))
+            .map(com.worldcup.dto.MatchDTO::from)
             .collect(Collectors.toList());
         
         return ResponseEntity.ok(matchDTOs);
@@ -268,7 +256,12 @@ public class UserController {
                             match.getAwayScore(),
                             points,
                             correct ? "CORRECT" : "WRONG",
-                            match.getStatus().name()
+                            match.getStatus().name(),
+                            match.getDuration(),
+                            match.getExtraTimeHome(),
+                            match.getExtraTimeAway(),
+                            match.getPenaltiesHome(),
+                            match.getPenaltiesAway()
                     );
                 })
                 .collect(Collectors.toList());

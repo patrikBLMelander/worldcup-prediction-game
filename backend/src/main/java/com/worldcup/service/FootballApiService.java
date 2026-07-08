@@ -276,19 +276,49 @@ public class FootballApiService {
             match.setStatus(MatchStatus.SCHEDULED);
         }
         
-        // Set scores if available
-        if (apiMatch.score != null) {
-            if (apiMatch.score.fullTime != null) {
-                match.setHomeScore(apiMatch.score.fullTime.home);
-                match.setAwayScore(apiMatch.score.fullTime.away);
-            } else if (apiMatch.score.halfTime != null) {
-                // Use half-time score if full-time not available (for live matches)
-                match.setHomeScore(apiMatch.score.halfTime.home);
-                match.setAwayScore(apiMatch.score.halfTime.away);
-            }
-        }
-        
+        applyScores(match, apiMatch);
+
         return match;
+    }
+
+    /**
+     * Copy scores from the API onto a Match.
+     *
+     * <p>The score that <em>counts</em> is the regulation (90-minute) result: a
+     * knockout decided in extra time or on penalties still counts as its 90-minute
+     * outcome (e.g. 1-1 that goes to penalties is a draw). football-data.org's
+     * {@code fullTime} is the aggregate <em>including</em> extra time and penalties,
+     * so we prefer {@code regularTime} (present only for ET/penalty matches) and
+     * fall back to {@code fullTime} for regular-time matches. During a live match
+     * neither is final, so we fall back to the running {@code halfTime} score.
+     *
+     * <p>The extra-time and penalty tallies are stored separately for display only.
+     */
+    private void applyScores(Match match, MatchData apiMatch) {
+        ScoreData score = apiMatch.score;
+        if (score == null) {
+            return;
+        }
+
+        ScoreDetail counting = score.regularTime != null ? score.regularTime : score.fullTime;
+        if (counting != null && counting.home != null && counting.away != null) {
+            match.setHomeScore(counting.home);
+            match.setAwayScore(counting.away);
+        } else if (score.halfTime != null && match.getStatus() == MatchStatus.LIVE) {
+            // Live match without a settled score yet: show the running half-time score.
+            match.setHomeScore(score.halfTime.home);
+            match.setAwayScore(score.halfTime.away);
+        }
+
+        match.setDuration(score.duration);
+        if (score.extraTime != null) {
+            match.setExtraTimeHome(score.extraTime.home);
+            match.setExtraTimeAway(score.extraTime.away);
+        }
+        if (score.penalties != null) {
+            match.setPenaltiesHome(score.penalties.home);
+            match.setPenaltiesAway(score.penalties.away);
+        }
     }
 
     /**
@@ -323,18 +353,9 @@ public class FootballApiService {
         // Update group/stage label (e.g. when API moves a match between rounds)
         existingMatch.setGroup(stageLabel(apiMatch));
         
-        // Update scores
-        if (apiMatch.score != null) {
-            if (apiMatch.score.fullTime != null) {
-                existingMatch.setHomeScore(apiMatch.score.fullTime.home);
-                existingMatch.setAwayScore(apiMatch.score.fullTime.away);
-            } else if (apiMatch.score.halfTime != null && existingMatch.getStatus() == MatchStatus.LIVE) {
-                // Update with half-time score for live matches
-                existingMatch.setHomeScore(apiMatch.score.halfTime.home);
-                existingMatch.setAwayScore(apiMatch.score.halfTime.away);
-            }
-        }
-        
+        // Update scores (regulation result is the source of truth; see applyScores)
+        applyScores(existingMatch, apiMatch);
+
         // Update match date if changed (for postponed matches)
         if (apiMatch.utcDate != null) {
             ZonedDateTime zonedDateTime = ZonedDateTime.parse(apiMatch.utcDate, API_DATE_FORMATTER);
@@ -374,8 +395,12 @@ public class FootballApiService {
     @Data
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class ScoreData {
-        private ScoreDetail fullTime;
+        private String duration; // REGULAR / EXTRA_TIME / PENALTY_SHOOTOUT
+        private ScoreDetail fullTime;   // aggregate INCLUDING extra time and penalties
         private ScoreDetail halfTime;
+        private ScoreDetail regularTime; // 90-minute score (only present for ET/penalty matches)
+        private ScoreDetail extraTime;   // goals in extra time (only for ET/penalty matches)
+        private ScoreDetail penalties;   // penalty shootout tally (only for penalty matches)
     }
 
     @Data

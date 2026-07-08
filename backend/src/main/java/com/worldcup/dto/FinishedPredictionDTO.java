@@ -20,10 +20,15 @@ public class FinishedPredictionDTO {
     private String venue;
     private String group;
     private PredictionOutcome predictedOutcome;
-    private Integer actualHomeScore;
-    private Integer actualAwayScore;
+    private Integer actualHomeScore; // regulation (90-minute) result
+    private Integer actualAwayScore; // regulation (90-minute) result
     private Integer points;
     private String resultType; // "CORRECT", "WRONG"
     private String matchStatus; // "SCHEDULED", "LIVE", "FINISHED", "CANCELLED"
+    private String duration; // REGULAR / EXTRA_TIME / PENALTY_SHOOTOUT (display only)
+    private Integer extraTimeHome;
+    private Integer extraTimeAway;
+    private Integer penaltiesHome;
+    private Integer penaltiesAway;
 }
 

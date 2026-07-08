@@ -271,6 +271,28 @@ const Matches = () => {
     return null;
   };
 
+  // Small superscript shown next to a team's regulation score for knockout
+  // matches decided after 90 minutes (display only - the big number is the
+  // regulation score that actually counts). Penalties show as "+N".
+  const scoreSuffix = (match, side) => {
+    if (match.duration === 'PENALTY_SHOOTOUT') {
+      const p = side === 'home' ? match.penaltiesHome : match.penaltiesAway;
+      return p !== null && p !== undefined ? `+${p}` : null;
+    }
+    if (match.duration === 'EXTRA_TIME') {
+      const et = side === 'home' ? match.extraTimeHome : match.extraTimeAway;
+      return et !== null && et !== undefined ? `${et}` : null;
+    }
+    return null;
+  };
+
+  // Short label for how a knockout was decided, or null for a normal result.
+  const deciderLabel = (match) => {
+    if (match.duration === 'PENALTY_SHOOTOUT') return 'pens';
+    if (match.duration === 'EXTRA_TIME') return 'a.e.t.';
+    return null;
+  };
+
   useEffect(() => {
     let filtered = matches;
 
@@ -620,11 +642,17 @@ const Matches = () => {
                         }} />
                         <span className={isMobile ? 'mobile-team-name' : 'desktop-team-name'}>{match.homeTeam}</span>
                         {match.homeScore !== null && match.awayScore !== null && (
-                          <span className={isMobile ? 'mobile-score' : 'desktop-score'}>{match.homeScore}</span>
+                          <span className={isMobile ? 'mobile-score' : 'desktop-score'}>
+                            {match.homeScore}
+                            {scoreSuffix(match, 'home') && <sup className="score-extra">{scoreSuffix(match, 'home')}</sup>}
+                          </span>
                         )}
                         <span className={isMobile ? 'mobile-vs' : 'desktop-vs'}>vs</span>
                         {match.homeScore !== null && match.awayScore !== null && (
-                          <span className={isMobile ? 'mobile-score' : 'desktop-score'}>{match.awayScore}</span>
+                          <span className={isMobile ? 'mobile-score' : 'desktop-score'}>
+                            {match.awayScore}
+                            {scoreSuffix(match, 'away') && <sup className="score-extra">{scoreSuffix(match, 'away')}</sup>}
+                          </span>
                         )}
                         <span className={isMobile ? 'mobile-team-name' : 'desktop-team-name'}>{match.awayTeam}</span>
                         <img src={awayLogoUrl} alt={match.awayTeam} className={isMobile ? 'mobile-team-logo' : 'desktop-team-logo'} onError={(e) => {
@@ -632,6 +660,9 @@ const Matches = () => {
                             e.target.src = getFlagUrl(match.awayTeam);
                           }
                         }} />
+                        {deciderLabel(match) && (
+                          <span className="score-decider">{deciderLabel(match)}</span>
+                        )}
                         {prediction && prediction.outcome ? (
                           <span className={`${isMobile ? 'mobile-prediction-result' : 'desktop-prediction-result'} ${pointsClass(prediction.points)}`}>
                             {outcomeLabel(match, prediction.outcome)}
@@ -727,7 +758,12 @@ const Matches = () => {
                         <div className="result-row">
                           <span className="result-label">Final Score</span>
                           <span className="result-actual-score">
-                            {match.homeScore} - {match.awayScore}
+                            {match.homeScore}
+                            {scoreSuffix(match, 'home') && <sup className="score-extra">{scoreSuffix(match, 'home')}</sup>}
+                            {' - '}
+                            {match.awayScore}
+                            {scoreSuffix(match, 'away') && <sup className="score-extra">{scoreSuffix(match, 'away')}</sup>}
+                            {deciderLabel(match) && <span className="score-decider">{deciderLabel(match)}</span>}
                           </span>
                         </div>
                       </div>

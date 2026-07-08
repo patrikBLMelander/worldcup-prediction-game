@@ -20,19 +20,7 @@ public class WebSocketService {
      * Convert Match entity to MatchDTO
      */
     private MatchDTO convertToDTO(Match match) {
-        return new MatchDTO(
-            match.getId(),
-            match.getHomeTeam(),
-            match.getHomeTeamCrest(),
-            match.getAwayTeam(),
-            match.getAwayTeamCrest(),
-            match.getMatchDate(),
-            match.getVenue(),
-            match.getGroup(),
-            match.getStatus(),
-            match.getHomeScore(),
-            match.getAwayScore()
-        );
+        return MatchDTO.from(match);
     }
 
     /**

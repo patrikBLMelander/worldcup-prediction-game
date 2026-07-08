@@ -59,6 +59,27 @@ const PublicProfile = () => {
     return '—';
   };
 
+  // Small superscript next to a team's regulation score for knockout matches
+  // decided after 90 minutes (display only). Penalties show as "+N".
+  const scoreSuffix = (prediction, side) => {
+    if (prediction.duration === 'PENALTY_SHOOTOUT') {
+      const p = side === 'home' ? prediction.penaltiesHome : prediction.penaltiesAway;
+      return p !== null && p !== undefined ? `+${p}` : null;
+    }
+    if (prediction.duration === 'EXTRA_TIME') {
+      const et = side === 'home' ? prediction.extraTimeHome : prediction.extraTimeAway;
+      return et !== null && et !== undefined ? `${et}` : null;
+    }
+    return null;
+  };
+
+  // Short label for how a knockout was decided, or null for a normal result.
+  const deciderLabel = (prediction) => {
+    if (prediction.duration === 'PENALTY_SHOOTOUT') return 'pens';
+    if (prediction.duration === 'EXTRA_TIME') return 'a.e.t.';
+    return null;
+  };
+
   const formatDate = (dateString) => {
     // Parse date string as UTC (backend stores as UTC LocalDateTime)
     const utcDate = dateString.endsWith('Z') 
@@ -235,9 +256,16 @@ const PublicProfile = () => {
                 
                 const isLive = prediction.matchStatus === 'LIVE';
                 const isFinished = prediction.matchStatus === 'FINISHED';
-                
+
+                // Colour the card's left border by correctness, matching the
+                // Results page: green for a correct outcome, red for wrong.
+                let resultType = null;
+                if (isFinished && prediction.points !== null && prediction.points !== undefined) {
+                  resultType = prediction.points > 0 ? 'result-correct-winner' : 'result-wrong';
+                }
+
                 return (
-                  <div key={prediction.matchId} className="prediction-card match-card results-view">
+                  <div key={prediction.matchId} className={`prediction-card match-card results-view ${resultType || ''}`}>
                     <div className="match-header">
                       <div className="match-header-left">
                         {isLive && <span className="match-status status-live">LIVE</span>}
@@ -271,23 +299,32 @@ const PublicProfile = () => {
                         />
                         <span className="team-name">{prediction.homeTeam}</span>
                         {prediction.actualHomeScore !== null && prediction.actualAwayScore !== null && (
-                          <span className="score">{prediction.actualHomeScore}</span>
+                          <span className="score">
+                            {prediction.actualHomeScore}
+                            {scoreSuffix(prediction, 'home') && <sup className="score-extra">{scoreSuffix(prediction, 'home')}</sup>}
+                          </span>
                         )}
                         <span className="vs">vs</span>
                         {prediction.actualHomeScore !== null && prediction.actualAwayScore !== null && (
-                          <span className="score">{prediction.actualAwayScore}</span>
+                          <span className="score">
+                            {prediction.actualAwayScore}
+                            {scoreSuffix(prediction, 'away') && <sup className="score-extra">{scoreSuffix(prediction, 'away')}</sup>}
+                          </span>
                         )}
                         <span className="team-name">{prediction.awayTeam}</span>
-                        <img 
-                          src={awayLogoUrl} 
-                          alt={prediction.awayTeam} 
-                          className="team-logo" 
+                        <img
+                          src={awayLogoUrl}
+                          alt={prediction.awayTeam}
+                          className="team-logo"
                           onError={(e) => {
                             if (prediction.awayTeamCrest) {
                               e.target.src = getFlagUrl(prediction.awayTeam);
                             }
-                          }} 
+                          }}
                         />
+                        {deciderLabel(prediction) && (
+                          <span className="score-decider">{deciderLabel(prediction)}</span>
+                        )}
                         {prediction.predictedOutcome ? (
                           <span className={`prediction-result points-${pointsColor}`}>
                             {outcomeLabel(prediction, prediction.predictedOutcome)}

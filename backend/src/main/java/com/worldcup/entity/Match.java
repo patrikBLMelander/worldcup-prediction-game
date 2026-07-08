@@ -54,10 +54,32 @@ public class Match {
     private MatchStatus status = MatchStatus.SCHEDULED;
 
     @Column
-    private Integer homeScore; // Actual result
+    private Integer homeScore; // Regulation (90-minute) result - source of truth for scoring
 
     @Column
-    private Integer awayScore; // Actual result
+    private Integer awayScore; // Regulation (90-minute) result - source of truth for scoring
+
+    /**
+     * How the match was decided: REGULAR, EXTRA_TIME, or PENALTY_SHOOTOUT
+     * (from football-data.org score.duration). Null for matches without a result.
+     * Scoring always uses the regulation score above; these fields are display-only.
+     */
+    @Column(length = 30)
+    private String duration;
+
+    // Goals scored in extra time (null unless the match went to extra time).
+    @Column
+    private Integer extraTimeHome;
+
+    @Column
+    private Integer extraTimeAway;
+
+    // Penalty shootout tally (null unless the match went to penalties).
+    @Column
+    private Integer penaltiesHome;
+
+    @Column
+    private Integer penaltiesAway;
 
     @Column(name = "external_api_id", length = 100)
     private String externalApiId; // ID from external API (e.g., Football-Data.org, API-Football)

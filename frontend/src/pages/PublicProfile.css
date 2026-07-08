@@ -340,6 +340,24 @@
   font-size: 1rem;
 }
 
+/* Extra-time / penalty annotations shown next to a knockout regulation score */
+.prediction-card .score-extra {
+  font-size: 0.65em;
+  font-weight: 700;
+  color: var(--text-secondary, #888);
+  margin-left: 1px;
+  line-height: 0;
+}
+
+.prediction-card .score-decider {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary, #888);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
 .prediction-card .prediction-result {
   margin-left: auto;
   flex-shrink: 0;
