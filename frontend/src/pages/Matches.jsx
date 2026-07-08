@@ -7,6 +7,7 @@ import apiClient from '../config/api';
 import Navigation from '../components/Navigation';
 import CountdownTimer from '../components/CountdownTimer';
 import StandingsModal from '../components/StandingsModal';
+import LeagueMatchPicks from '../components/LeagueMatchPicks';
 import { getFlagUrl, hasKnownFlag } from '../utils/countryFlags';
 import './Matches.css';
 
@@ -30,6 +31,13 @@ const Matches = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [standingsGroup, setStandingsGroup] = useState(null); // Selected group for standings modal
 
+  // Leagues the user belongs to, for comparing predictions after lock.
+  const [leagues, setLeagues] = useState([]);
+  const [selectedLeagueId, setSelectedLeagueId] = useState(() => {
+    const saved = localStorage.getItem('matchesLeagueId');
+    return saved ? parseInt(saved, 10) : null;
+  });
+
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState(() => {
     // Initialize from URL parameter if present
@@ -41,6 +49,30 @@ const Matches = () => {
   useEffect(() => {
     markSectionAsRead('/matches');
   }, [markSectionAsRead]);
+
+  // Load the user's leagues (for the "League picks" comparison on locked matches).
+  useEffect(() => {
+    const fetchLeagues = async () => {
+      try {
+        const res = await apiClient.get('/leagues/mine');
+        setLeagues(res.data);
+        setSelectedLeagueId((prev) => {
+          if (prev && res.data.some((l) => l.id === prev)) return prev;
+          return res.data.length > 0 ? res.data[0].id : null;
+        });
+      } catch (e) {
+        // Leagues are optional here; silently skip the feature if unavailable.
+      }
+    };
+    fetchLeagues();
+  }, []);
+
+  // Remember the chosen league across visits.
+  useEffect(() => {
+    if (selectedLeagueId) {
+      localStorage.setItem('matchesLeagueId', String(selectedLeagueId));
+    }
+  }, [selectedLeagueId]);
 
   // Sync activeTab with URL parameter (for browser back/forward navigation)
   useEffect(() => {
@@ -521,9 +553,29 @@ const Matches = () => {
 
         <div className="matches-count">
           Showing {filteredMatches.length} {activeTab === 'upcoming' ? 'upcoming' : 'finished'} {filteredMatches.length === 1 ? 'match' : 'matches'}
-          {filteredMatches.length !== matches.filter(m => activeTab === 'upcoming' ? (m.status === 'SCHEDULED' || m.status === 'LIVE') : m.status === 'FINISHED').length && 
+          {filteredMatches.length !== matches.filter(m => activeTab === 'upcoming' ? (m.status === 'SCHEDULED' || m.status === 'LIVE') : m.status === 'FINISHED').length &&
             ` (of ${matches.filter(m => activeTab === 'upcoming' ? (m.status === 'SCHEDULED' || m.status === 'LIVE') : m.status === 'FINISHED').length} total)`}
         </div>
+
+        {/* League to compare picks against (shown on locked matches after kickoff) */}
+        {leagues.length > 0 && (
+          <div className="matches-league-compare">
+            <span className="matches-league-compare-label">👥 League picks:</span>
+            {leagues.length === 1 ? (
+              <span className="matches-league-compare-name">{leagues[0].name}</span>
+            ) : (
+              <select
+                className="matches-league-compare-select"
+                value={selectedLeagueId || ''}
+                onChange={(e) => setSelectedLeagueId(parseInt(e.target.value, 10))}
+              >
+                {leagues.map((l) => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
 
         {filteredMatches.length === 0 ? (
           <div className="no-matches">
@@ -741,6 +793,11 @@ const Matches = () => {
                         </div>
                       )}
                     </div>
+                  )}
+
+                  {/* League prediction split - only after the match locks (kickoff) */}
+                  {match.status !== 'SCHEDULED' && selectedLeagueId && (
+                    <LeagueMatchPicks leagueId={selectedLeagueId} matchId={match.id} />
                   )}
 
                   {/* Results summary for finished matches - only show when expanded on desktop */}

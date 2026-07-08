@@ -670,3 +670,98 @@
     font-size: 0.85rem;
   }
 }
+
+/* ---- Predictions view (league prediction splits) ---- */
+.lb-view-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.lb-view-btn {
+  background: var(--surface, #1e293b);
+  color: var(--text-secondary, #94a3b8);
+  border: 1px solid var(--border, #334155);
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lb-view-btn:hover {
+  color: var(--text-primary, #e2e8f0);
+}
+
+.lb-view-btn.active {
+  background: var(--primary-500, #6366f1);
+  color: #fff;
+  border-color: var(--primary-500, #6366f1);
+}
+
+.lb-splits-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lb-split-card {
+  background: var(--surface, #1e293b);
+  border: 1px solid var(--border, #334155);
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lb-split-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.lb-split-group {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary, #94a3b8);
+  background: var(--surface-elevated, rgba(255,255,255,0.04));
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.lb-split-teams {
+  font-weight: 700;
+  color: var(--text-primary, #e2e8f0);
+}
+
+/* ---- Live matches section (between the leaderboard table and the stat cards) ---- */
+.lb-live-section {
+  margin: 24px 0;
+}
+
+.lb-live-title {
+  font-size: 1.1rem;
+  margin: 0 0 2px;
+}
+
+.lb-live-subtitle {
+  font-size: 0.82rem;
+  color: var(--text-secondary, #94a3b8);
+  margin: 0 0 12px;
+}
+
+.lb-live-badge {
+  color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.12) !important;
+  animation: lb-live-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes lb-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}

@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import apiClient from '../config/api';
 import Navigation from '../components/Navigation';
+import PredictionSplitBar from '../components/PredictionSplitBar';
 import { formatCurrency } from '../utils/currency';
 import './Leaderboard.css';
 
@@ -19,6 +20,13 @@ const Leaderboard = () => {
   const [leaguesLoading, setLeaguesLoading] = useState(true);
   const [userPosition, setUserPosition] = useState(null);
   const { markSectionAsRead } = useNotifications();
+
+  // 'leaderboard' (default) or 'predictions' - only meaningful for a specific league.
+  const [view, setView] = useState('leaderboard');
+  const [splits, setSplits] = useState([]);
+  const [splitsLoading, setSplitsLoading] = useState(false);
+  // Live matches' splits, shown under the leaderboard table when a league is selected.
+  const [liveSplits, setLiveSplits] = useState([]);
 
   // Clear any notifications that belong to the Leaderboard section when this page is viewed
   useEffect(() => {
@@ -81,6 +89,50 @@ const Leaderboard = () => {
 
     fetchLeaderboard();
   }, [selectedLeagueId, user?.id, leaguesLoading]);
+
+  // Fetch the league's locked-match prediction splits when the Predictions view is active.
+  useEffect(() => {
+    const fetchSplits = async () => {
+      if (view !== 'predictions' || !selectedLeagueId) return;
+      try {
+        setSplitsLoading(true);
+        const res = await apiClient.get(`/leagues/${selectedLeagueId}/match-predictions`);
+        setSplits(res.data);
+      } catch (error) {
+        console.error('Failed to fetch prediction splits:', error);
+        setSplits([]);
+      } finally {
+        setSplitsLoading(false);
+      }
+    };
+    fetchSplits();
+  }, [view, selectedLeagueId]);
+
+  // The Predictions view only applies to a specific league; reset when leaving one.
+  useEffect(() => {
+    if (!selectedLeagueId && view !== 'leaderboard') {
+      setView('leaderboard');
+    }
+  }, [selectedLeagueId, view]);
+
+  // Live matches in the selected league, for the "Live now" section under the table.
+  useEffect(() => {
+    const fetchLive = async () => {
+      if (!selectedLeagueId) {
+        setLiveSplits([]);
+        return;
+      }
+      try {
+        const res = await apiClient.get(`/leagues/${selectedLeagueId}/match-predictions`, {
+          params: { status: 'LIVE' },
+        });
+        setLiveSplits(res.data);
+      } catch (error) {
+        setLiveSplits([]);
+      }
+    };
+    fetchLive();
+  }, [selectedLeagueId]);
 
   const getRankIcon = (position) => {
     switch (position) {
@@ -165,6 +217,60 @@ const Leaderboard = () => {
           </div>
         </div>
 
+        {/* View toggle - Predictions only applies to a specific league */}
+        {selectedLeagueId && (
+          <div className="lb-view-toggle">
+            <button
+              type="button"
+              className={`lb-view-btn ${view === 'leaderboard' ? 'active' : ''}`}
+              onClick={() => setView('leaderboard')}
+            >
+              🏆 Leaderboard
+            </button>
+            <button
+              type="button"
+              className={`lb-view-btn ${view === 'predictions' ? 'active' : ''}`}
+              onClick={() => setView('predictions')}
+            >
+              👥 Predictions
+            </button>
+          </div>
+        )}
+
+        {view === 'predictions' ? (
+          <div className="lb-predictions">
+            <div className="leaderboard-header">
+              <h1>👥 League Predictions</h1>
+              <p>How members predicted each match, revealed after kickoff.</p>
+            </div>
+            {splitsLoading ? (
+              <div className="no-leaderboard"><p>Loading predictions…</p></div>
+            ) : splits.length === 0 ? (
+              <div className="no-leaderboard">
+                <p>No locked matches yet. Predictions appear here once matches kick off.</p>
+              </div>
+            ) : (
+              <div className="lb-splits-list">
+                {splits.map((split) => (
+                  <div key={split.matchId} className="lb-split-card">
+                    <div className="lb-split-header">
+                      <span className="lb-split-group">{split.group || 'Match'}</span>
+                      <span className="lb-split-teams">
+                        {split.homeTeam}
+                        {split.homeScore !== null && split.awayScore !== null
+                          ? ` ${split.homeScore}–${split.awayScore} `
+                          : ' vs '}
+                        {split.awayTeam}
+                      </span>
+                    </div>
+                    <PredictionSplitBar split={split} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+        <>
         <div className="leaderboard-header">
           <h1>🏆 Leaderboard</h1>
           <p>
@@ -257,23 +363,30 @@ const Leaderboard = () => {
           </div>
         )}
 
-        {leaderboard.length > 0 && (
-          <div className="leaderboard-stats">
-            <div className="stat-item">
-              <span className="stat-label">Total Players</span>
-              <span className="stat-value">{leaderboard.length}</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-label">Top Score</span>
-              <span className="stat-value">{leaderboard[0]?.totalPoints || 0} pts</span>
-            </div>
-            <div className="stat-item">
-              <span className="stat-label">Avg Score</span>
-              <span className="stat-value">
-                {Math.round(leaderboard.reduce((sum, entry) => sum + (entry.totalPoints || 0), 0) / leaderboard.length)} pts
-              </span>
+        {liveSplits.length > 0 && (
+          <div className="lb-live-section">
+            <h2 className="lb-live-title">🔴 Live now</h2>
+            <p className="lb-live-subtitle">Expand to see how the league called these matches.</p>
+            <div className="lb-splits-list">
+              {liveSplits.map((split) => (
+                <div key={split.matchId} className="lb-split-card">
+                  <div className="lb-split-header">
+                    <span className="lb-split-group lb-live-badge">LIVE</span>
+                    <span className="lb-split-teams">
+                      {split.homeTeam}
+                      {split.homeScore !== null && split.awayScore !== null
+                        ? ` ${split.homeScore}–${split.awayScore} `
+                        : ' vs '}
+                      {split.awayTeam}
+                    </span>
+                  </div>
+                  <PredictionSplitBar split={split} />
+                </div>
+              ))}
             </div>
           </div>
+        )}
+        </>
         )}
       </div>
       </div>

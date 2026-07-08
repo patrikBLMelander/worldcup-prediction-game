@@ -4,6 +4,8 @@ import com.worldcup.dto.CreateLeagueRequest;
 import com.worldcup.dto.LeagueSummaryDTO;
 import com.worldcup.dto.LeagueMemberDTO;
 import com.worldcup.dto.LeaderboardEntryDTO;
+import com.worldcup.dto.LeaguePredictionSplitDTO;
+import com.worldcup.exception.MatchNotFoundException;
 import com.worldcup.entity.League;
 import com.worldcup.entity.LeagueMembership;
 import com.worldcup.entity.LeagueRole;
@@ -48,6 +50,7 @@ public class LeagueService {
     private final LeagueMembershipRepository membershipRepository;
     private final PredictionRepository predictionRepository;
     private final RelativeScoringService relativeScoringService;
+    private final MatchService matchService;
     private final Optional<NotificationService> notificationService; // Optional - may not be available during startup
 
     public LeagueSummaryDTO createLeague(CreateLeagueRequest request, User owner) {
@@ -499,6 +502,168 @@ public class LeagueService {
                     return a.getJoinedAt().compareTo(b.getJoinedAt());
                 })
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * How this league's members predicted a single locked match. The requester
+     * must be a member, and the match must have kicked off (so revealing picks is
+     * safe).
+     */
+    @Transactional(readOnly = true)
+    public LeaguePredictionSplitDTO getMatchPredictionSplit(Long leagueId, Long matchId, User requester) {
+        League league = requireVisibleLeague(leagueId);
+        requireMember(league, requester);
+
+        Match match = matchService.findById(matchId)
+                .orElseThrow(() -> new MatchNotFoundException(matchId));
+        if (match.getStatus() == MatchStatus.SCHEDULED) {
+            throw new IllegalStateException("Predictions are hidden until the match kicks off");
+        }
+
+        List<User> members = membershipRepository.findByLeague(league).stream()
+                .map(LeagueMembership::getUser)
+                .distinct()
+                .collect(Collectors.toList());
+
+        List<Prediction> memberPredictions = predictionRepository.findByMatch(match).stream()
+                .filter(p -> members.stream().anyMatch(m -> m.getId().equals(p.getUser().getId())))
+                .collect(Collectors.toList());
+
+        return buildSplit(match, members, memberPredictions, requester);
+    }
+
+    /**
+     * How this league's members predicted every locked match within the league's
+     * date window, newest first. Only matches with at least one member prediction
+     * are included.
+     *
+     * @param statusFilter when non-null, only matches with this status are returned
+     *                     (e.g. {@code LIVE} for the leaderboard's live section)
+     */
+    @Transactional(readOnly = true)
+    public List<LeaguePredictionSplitDTO> getLockedMatchPredictionSplits(Long leagueId, User requester,
+                                                                         MatchStatus statusFilter) {
+        League league = requireVisibleLeague(leagueId);
+        requireMember(league, requester);
+
+        LocalDateTime start = league.getStartDate();
+        LocalDateTime end = league.getEndDate();
+
+        List<User> members = membershipRepository.findByLeague(league).stream()
+                .map(LeagueMembership::getUser)
+                .distinct()
+                .collect(Collectors.toList());
+
+        // Group members' predictions on locked, in-window matches by match.
+        Map<Long, Match> matchById = new HashMap<>();
+        Map<Long, List<Prediction>> predictionsByMatch = new HashMap<>();
+
+        for (User member : members) {
+            List<Prediction> predictions;
+            try {
+                predictions = predictionRepository.findByUserWithMatch(member);
+            } catch (Exception e) {
+                log.warn("JOIN FETCH query failed for user {}, falling back to regular query: {}", member.getId(), e.getMessage());
+                predictions = predictionRepository.findByUser(member);
+            }
+
+            for (Prediction p : predictions) {
+                Match match = p.getMatch();
+                if (match == null || p.getPredictedOutcome() == null) continue;
+                if (match.getStatus() == MatchStatus.SCHEDULED) continue; // not locked yet
+                if (statusFilter != null && match.getStatus() != statusFilter) continue;
+
+                LocalDateTime kickOff = match.getMatchDate();
+                if (kickOff.isBefore(start) || kickOff.isAfter(end)) continue;
+
+                matchById.putIfAbsent(match.getId(), match);
+                predictionsByMatch.computeIfAbsent(match.getId(), k -> new ArrayList<>()).add(p);
+            }
+        }
+
+        return matchById.values().stream()
+                .sorted((a, b) -> b.getMatchDate().compareTo(a.getMatchDate())) // newest first
+                .map(match -> buildSplit(match, members,
+                        predictionsByMatch.getOrDefault(match.getId(), List.of()), requester))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Build the outcome split for one match from a set of league members and their
+     * predictions on that match.
+     */
+    private LeaguePredictionSplitDTO buildSplit(Match match, List<User> members,
+                                                List<Prediction> memberPredictions, User requester) {
+        List<LeaguePredictionSplitDTO.Voter> homeWin = new ArrayList<>();
+        List<LeaguePredictionSplitDTO.Voter> draw = new ArrayList<>();
+        List<LeaguePredictionSplitDTO.Voter> awayWin = new ArrayList<>();
+
+        for (Prediction p : memberPredictions) {
+            User u = p.getUser();
+            LeaguePredictionSplitDTO.Voter voter = new LeaguePredictionSplitDTO.Voter(
+                    u.getId(), displayName(u), u.getId().equals(requester.getId()));
+            switch (p.getPredictedOutcome()) {
+                case HOME_WIN -> homeWin.add(voter);
+                case DRAW -> draw.add(voter);
+                case AWAY_WIN -> awayWin.add(voter);
+            }
+        }
+
+        // Requester first, then alphabetical, so "you" is easy to spot.
+        homeWin.sort(VOTER_ORDER);
+        draw.sort(VOTER_ORDER);
+        awayWin.sort(VOTER_ORDER);
+
+        int predictors = homeWin.size() + draw.size() + awayWin.size();
+        int noPickCount = Math.max(0, members.size() - predictors);
+
+        return new LeaguePredictionSplitDTO(
+                match.getId(),
+                match.getHomeTeam(),
+                match.getHomeTeamCrest(),
+                match.getAwayTeam(),
+                match.getAwayTeamCrest(),
+                match.getMatchDate(),
+                match.getGroup(),
+                match.getStatus(),
+                match.getHomeScore(),
+                match.getAwayScore(),
+                homeWin,
+                draw,
+                awayWin,
+                noPickCount
+        );
+    }
+
+    private static final java.util.Comparator<LeaguePredictionSplitDTO.Voter> VOTER_ORDER =
+            java.util.Comparator.comparing((LeaguePredictionSplitDTO.Voter v) -> !v.isMe()) // me first
+                    .thenComparing(v -> v.screenName() == null ? "" : v.screenName().toLowerCase());
+
+    private String displayName(User user) {
+        String name = user.getScreenName();
+        if (name != null && !name.isBlank()) {
+            return name;
+        }
+        String email = user.getEmail();
+        if (email != null && email.contains("@")) {
+            return email.substring(0, email.indexOf('@'));
+        }
+        return email != null ? email : ("User " + user.getId());
+    }
+
+    private League requireVisibleLeague(Long leagueId) {
+        League league = leagueRepository.findById(leagueId)
+                .orElseThrow(() -> new LeagueNotFoundException(leagueId));
+        if (Boolean.TRUE.equals(league.getHidden())) {
+            throw new LeagueNotFoundException(leagueId);
+        }
+        return league;
+    }
+
+    private void requireMember(League league, User user) {
+        if (membershipRepository.findByLeagueAndUser(league, user).isEmpty()) {
+            throw new UnauthorizedException("You are not a member of this league");
+        }
     }
 
     private LeagueSummaryDTO toSummary(League league) {

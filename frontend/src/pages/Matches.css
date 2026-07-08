@@ -799,6 +799,36 @@
   font-size: 1rem;
 }
 
+/* League "compare picks against" selector above the match list */
+.matches-league-compare {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 12px;
+  font-size: 0.82rem;
+  color: var(--text-secondary, #94a3b8);
+  flex-wrap: wrap;
+}
+
+.matches-league-compare-label {
+  font-weight: 600;
+}
+
+.matches-league-compare-name {
+  font-weight: 600;
+  color: var(--text-primary, #e2e8f0);
+}
+
+.matches-league-compare-select {
+  background: var(--surface, #1e293b);
+  color: var(--text-primary, #e2e8f0);
+  border: 1px solid var(--border, #334155);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
 /* Extra-time / penalty annotations shown next to a knockout regulation score */
 .score-extra {
   font-size: 0.65em;

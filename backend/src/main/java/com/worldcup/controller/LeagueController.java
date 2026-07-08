@@ -5,6 +5,8 @@ import com.worldcup.dto.JoinLeagueRequest;
 import com.worldcup.dto.LeagueSummaryDTO;
 import com.worldcup.dto.LeagueMemberDTO;
 import com.worldcup.dto.LeaderboardEntryDTO;
+import com.worldcup.dto.LeaguePredictionSplitDTO;
+import com.worldcup.entity.MatchStatus;
 import com.worldcup.entity.User;
 import com.worldcup.security.CurrentUser;
 import com.worldcup.service.LeagueService;
@@ -56,6 +58,30 @@ public class LeagueController {
     public ResponseEntity<List<LeagueMemberDTO>> getLeagueMembers(@PathVariable Long leagueId) {
         List<LeagueMemberDTO> members = leagueService.getLeagueMembers(leagueId);
         return ResponseEntity.ok(members);
+    }
+
+    /**
+     * How this league's members predicted a single locked match. 403 if the caller
+     * isn't a member; 400 if the match hasn't kicked off yet.
+     */
+    @GetMapping("/{leagueId}/match-predictions/{matchId}")
+    public ResponseEntity<LeaguePredictionSplitDTO> getMatchPredictionSplit(
+            @PathVariable Long leagueId, @PathVariable Long matchId) {
+        User user = currentUser.getCurrentUserOrThrow();
+        return ResponseEntity.ok(leagueService.getMatchPredictionSplit(leagueId, matchId, user));
+    }
+
+    /**
+     * How this league's members predicted every locked match in the league window
+     * (newest first). Powers the league "Predictions" tab. Pass {@code ?status=LIVE}
+     * to get only in-progress matches (used by the leaderboard's live section).
+     */
+    @GetMapping("/{leagueId}/match-predictions")
+    public ResponseEntity<List<LeaguePredictionSplitDTO>> getMatchPredictionSplits(
+            @PathVariable Long leagueId,
+            @RequestParam(required = false) MatchStatus status) {
+        User user = currentUser.getCurrentUserOrThrow();
+        return ResponseEntity.ok(leagueService.getLockedMatchPredictionSplits(leagueId, user, status));
     }
 
     @PostMapping("/{leagueId}/hide")
