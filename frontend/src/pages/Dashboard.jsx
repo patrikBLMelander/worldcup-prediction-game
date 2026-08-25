@@ -42,7 +42,9 @@ const Dashboard = () => {
           totalMatches: allMatches.length,
           scheduledMatches: scheduledMatches.length,
           myPredictions: myPredictions.length,
-          leaderboardPosition: position || leaderboard.length + 1,
+          // Unranked shows as '-' on an empty board (start of a new season)
+          // rather than telling everyone they are #1.
+          leaderboardPosition: position || (leaderboard.length ? leaderboard.length + 1 : null),
         });
 
         // Update user to get latest points (only once, not in dependency)
@@ -114,7 +116,7 @@ const Dashboard = () => {
             <div className="stat-card">
               <div className="stat-icon">🥇</div>
               <div className="stat-content">
-                <h3>#{stats.leaderboardPosition}</h3>
+                <h3>{stats.leaderboardPosition ? `#${stats.leaderboardPosition}` : '–'}</h3>
                 <p>Leaderboard Position</p>
               </div>
             </div>

@@ -33,6 +33,10 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health 2>/dev/null || exit 1
 
-# Run the application
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# JVM options. Overridable so a resting deployment can cap heap (and therefore
+# billed memory), e.g. JAVA_OPTS="-Xms128m -Xmx256m -XX:+UseSerialGC".
+ENV JAVA_OPTS=""
+
+# Run the application (exec so the JVM stays PID 1 and receives signals)
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar app.jar"]
 

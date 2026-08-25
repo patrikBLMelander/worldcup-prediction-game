@@ -37,6 +37,16 @@ public interface LeagueRepository extends JpaRepository<League, Long> {
     @Query(value = "UPDATE leagues SET hidden = TRUE, achievements_processed = FALSE",
             nativeQuery = true)
     int hideAllAndResetAchievementsProcessed();
+
+    // End-of-tournament archive: hides every remaining league without touching
+    // achievements_processed, so placements that were already awarded stay
+    // awarded and won't be re-processed if a league is ever unhidden.
+    // flush/clear keep pending JPA writes (e.g. the achievement scheduler
+    // marking leagues processed) from overwriting the hidden flag afterwards.
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = "UPDATE leagues SET hidden = TRUE WHERE hidden IS NULL OR hidden = FALSE",
+            nativeQuery = true)
+    int archiveAllLeagues();
 }
 
 

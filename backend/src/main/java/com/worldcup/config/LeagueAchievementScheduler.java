@@ -7,6 +7,7 @@ import com.worldcup.service.AchievementService;
 import com.worldcup.service.LeagueService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,9 +29,23 @@ public class LeagueAchievementScheduler {
     private final AchievementService achievementService;
 
     /**
+     * Set to false between tournaments (viloläge) to skip the nightly sweep -
+     * see VILOLAGE_SETUP.md. The manual trigger below still works when off.
+     */
+    @Value("${league.achievement.scheduler.enabled:true}")
+    private boolean schedulerEnabled;
+
+    /**
      * Runs daily at 2 AM to check for finished leagues and award achievements
      */
     @Scheduled(cron = "0 0 2 * * ?") // Daily at 2 AM
+    public void scheduledCheckFinishedLeagues() {
+        if (!schedulerEnabled) {
+            return;
+        }
+        checkFinishedLeagues();
+    }
+
     public void checkFinishedLeagues() {
         log.info("Checking for finished leagues to award achievements...");
         

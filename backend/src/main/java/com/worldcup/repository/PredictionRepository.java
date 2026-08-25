@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -43,6 +44,24 @@ public interface PredictionRepository extends JpaRepository<Prediction, Long> {
            "GROUP BY p.user.id " +
            "ORDER BY totalPoints DESC")
     List<Object[]> findLeaderboard();
+
+    /**
+     * Global leaderboard for the current season only: predictions on matches
+     * kicking off at or after {@code seasonStart}. Used when a season start is
+     * configured so a finished tournament's points don't carry over.
+     */
+    @Query("SELECT p.user.id, COALESCE(SUM(p.points), 0) as totalPoints " +
+           "FROM Prediction p " +
+           "WHERE p.match.matchDate >= :seasonStart " +
+           "GROUP BY p.user.id " +
+           "ORDER BY totalPoints DESC")
+    List<Object[]> findLeaderboardSince(@Param("seasonStart") LocalDateTime seasonStart);
+
+    long countByUser(User user);
+
+    @Query("SELECT COUNT(p) FROM Prediction p " +
+           "WHERE p.user = :user AND p.match.matchDate >= :seasonStart")
+    long countByUserSince(@Param("user") User user, @Param("seasonStart") LocalDateTime seasonStart);
 
     // Deletes predictions tied to any non-World-Cup match. Mirrors the
     // allow-list in MatchRepository.deleteNonWorldCupMatches(); must run

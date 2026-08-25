@@ -7,6 +7,7 @@ import com.worldcup.service.PredictionService;
 import com.worldcup.service.WebSocketService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,9 +28,17 @@ public class MatchStatusScheduler {
     private final WebSocketService webSocketService;
     private final PredictionService predictionService;
 
+    /**
+     * Set to false between tournaments (viloläge) to stop the status sweep
+     * entirely - see VILOLAGE_SETUP.md. Statuses can still be changed by hand
+     * from the admin UI while it is off.
+     */
+    @Value("${match.status.scheduler.enabled:true}")
+    private boolean schedulerEnabled;
+
     @jakarta.annotation.PostConstruct
     public void init() {
-        log.info("MatchStatusScheduler component initialized and ready to run");
+        log.info("MatchStatusScheduler component initialized (enabled={})", schedulerEnabled);
     }
 
     /**
@@ -39,15 +48,19 @@ public class MatchStatusScheduler {
      */
     @Scheduled(fixedRateString = "${match.status.update.interval:30000}")
     public void updateMatchStatuses() {
+        if (!schedulerEnabled) {
+            return;
+        }
+
         try {
             // Use UTC for all time comparisons to match PostgreSQL's UTC storage
             LocalDateTime now = LocalDateTime.now(ZoneOffset.UTC);
 
-            log.info("=== SCHEDULER RUNNING - Current time (UTC): {} ===", now);
+            log.debug("=== SCHEDULER RUNNING - Current time (UTC): {} ===", now);
 
             // Update SCHEDULED matches to LIVE when match time is reached or passed
             List<Match> scheduledMatches = matchRepository.findByStatus(MatchStatus.SCHEDULED);
-            log.info("Found {} scheduled matches to check", scheduledMatches.size());
+            log.debug("Found {} scheduled matches to check", scheduledMatches.size());
             
             // Collect match IDs that need updating (to avoid concurrent modification)
             List<Long> matchesToUpdateToLive = new ArrayList<>();
@@ -66,7 +79,7 @@ public class MatchStatusScheduler {
             // Note: In practice, matches should be manually marked as FINISHED by admin
             // after setting the final scores. This scheduler is a fallback.
             List<Match> liveMatches = matchRepository.findByStatus(MatchStatus.LIVE);
-            log.info("Found {} live matches to check", liveMatches.size());
+            log.debug("Found {} live matches to check", liveMatches.size());
             
             // Collect match IDs that need updating (to avoid concurrent modification)
             List<Long> matchesToUpdateToFinished = new ArrayList<>();

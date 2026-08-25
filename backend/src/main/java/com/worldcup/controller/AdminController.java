@@ -19,7 +19,9 @@ import com.worldcup.repository.UserAchievementRepository;
 import com.worldcup.repository.UserRepository;
 import com.worldcup.security.AdminRequired;
 import com.worldcup.config.FootballApiSyncScheduler;
+import com.worldcup.config.LeagueAchievementScheduler;
 import com.worldcup.entity.Notification;
+import com.worldcup.service.LeagueService;
 import com.worldcup.service.MatchService;
 import com.worldcup.service.NotificationService;
 import com.worldcup.service.PredictionService;
@@ -57,8 +59,11 @@ public class AdminController {
     private final LeagueRepository leagueRepository;
     private final UserAchievementRepository userAchievementRepository;
     private final NotificationRepository notificationRepository;
+    private final LeagueService leagueService;
+    private final LeagueAchievementScheduler leagueAchievementScheduler;
 
     private static final String CLEANUP_CONFIRM_TOKEN = "YES_DELETE_TEST_DATA";
+    private static final String ARCHIVE_CONFIRM_TOKEN = "YES_ARCHIVE_LEAGUES";
     private static final long MIN_KEEP_MATCHES = 50;
 
     @GetMapping("/users")
@@ -352,6 +357,60 @@ public class AdminController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(java.util.Map.of("error", "Failed to send test notification: " + e.getMessage()));
         }
+    }
+
+    /**
+     * End-of-tournament archive: hides every league so the next tournament
+     * starts with a clean slate.
+     *
+     * Nothing is deleted - memberships, chat history, predictions and earned
+     * achievements are all preserved, the leagues just stop appearing in any
+     * user-facing list. By default any finished league that hasn't had its
+     * leaderboard achievements awarded yet is processed first, so final
+     * placements are locked in before the leagues disappear.
+     *
+     * Requires <code>?confirm=YES_ARCHIVE_LEAGUES</code>. To bring a league
+     * back, clear its <code>hidden</code> flag in the database.
+     */
+    @PostMapping("/leagues/archive-all")
+    public ResponseEntity<?> archiveAllLeagues(
+            @RequestParam(required = false) String confirm,
+            @RequestParam(defaultValue = "true") boolean awardAchievementsFirst) {
+        if (!ARCHIVE_CONFIRM_TOKEN.equals(confirm)) {
+            return ResponseEntity.badRequest().body(java.util.Map.of(
+                "error", "Confirmation required",
+                "instruction", "POST /api/admin/leagues/archive-all?confirm=" + ARCHIVE_CONFIRM_TOKEN
+            ));
+        }
+
+        // Separate transactions on purpose: achievements must be committed
+        // before the leagues are hidden, since finished-league lookups skip
+        // hidden leagues.
+        boolean achievementsProcessed = false;
+        if (awardAchievementsFirst) {
+            try {
+                leagueAchievementScheduler.processFinishedLeaguesNow();
+                achievementsProcessed = true;
+            } catch (Exception e) {
+                log.error("Failed to award achievements for finished leagues before archiving: {}",
+                        e.getMessage(), e);
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(java.util.Map.of(
+                    "error", "Failed to award achievements before archiving: " + e.getMessage(),
+                    "hint", "Retry, or archive without awarding: ?confirm=" + ARCHIVE_CONFIRM_TOKEN
+                            + "&awardAchievementsFirst=false"
+                ));
+            }
+        }
+
+        int leaguesArchived = leagueService.archiveAllLeagues();
+
+        log.warn("Admin archive-all-leagues finished. leaguesArchived={}, achievementsProcessedFirst={}",
+                leaguesArchived, achievementsProcessed);
+
+        return ResponseEntity.ok(java.util.Map.of(
+            "leaguesArchived", leaguesArchived,
+            "achievementsProcessedFirst", achievementsProcessed
+        ));
     }
 
     /**

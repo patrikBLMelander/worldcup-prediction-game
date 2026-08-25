@@ -134,6 +134,108 @@ football.api.sync.finished.interval=300000
 match.status.update.interval=30000
 ```
 
+## Efter turneringen: fullt viloläge + arkivering
+
+När ett mästerskap är avslutat vill man vanligtvis två saker: minska kostnaderna
+så långt det går utan att ta ner appen, och lägga undan ligorna så att nästa
+turnering startar från ett rent blad. Appen är fortfarande online och alla
+achievements, placeringar och gamla tips finns kvar – ingenting raderas.
+
+### Steg 1: Sätt Railway-variabler (backend-tjänsten)
+
+```bash
+# Inga externa API-anrop alls
+FOOTBALL_API_ENABLED=false
+
+# Stäng av bakgrundsjobben helt (ingen periodisk databastrafik)
+MATCH_STATUS_SCHEDULER_ENABLED=false
+LEAGUE_ACHIEVEMENT_SCHEDULER_ENABLED=false
+
+# Mindre loggvolym
+LOG_LEVEL_ROOT=WARN
+LOG_LEVEL_APP=INFO
+LOG_LEVEL_SCHEDULING=WARN
+
+# Mindre minne och färre databasanslutningar
+JAVA_OPTS=-Xms128m -Xmx256m -XX:+UseSerialGC
+DB_POOL_MAX_SIZE=3
+DB_POOL_MIN_IDLE=1
+
+# Nollställ den globala topplistan för nästa säsong (se steg 3)
+APP_SEASON_START=2026-09-01T00:00
+```
+
+`JAVA_OPTS` kräver en ny deploy (den läses av `ENTRYPOINT` i
+`backend/Dockerfile`); övriga variabler räcker det med en omstart för.
+
+Effekt: JVM:en tar ~256 MB istället för att växa mot containergränsen,
+schedulers gör inga databasanrop när ingen är inne, och loggarna innehåller
+bara det som betyder något. Frontend-tjänsten (nginx med statiska filer) är
+redan billig och behöver inget.
+
+**Detta kostar fortfarande pengar:** Postgres-volymen (lagring debiteras även
+när ingen använder appen) och den lilla baskostnaden för två tjänster som är
+uppe dygnet runt. Vill du ner till nästan noll får du stoppa
+backend-/frontend-tjänsterna helt och bara behålla databasen – då är appen
+otillgänglig tills du deployar igen.
+
+### Steg 2: Arkivera alla ligor
+
+```bash
+curl -X POST "https://<backend>/api/admin/leagues/archive-all?confirm=YES_ARCHIVE_LEAGUES" \
+  -H "Authorization: Bearer <admin-jwt>"
+```
+
+Svar: `{"leaguesArchived": N, "achievementsProcessedFirst": true}`
+
+Vad som händer:
+
+1. Alla avslutade ligor som ännu inte fått sina leaderboard-achievements
+   utdelade behandlas först, så slutplaceringarna hinner delas ut innan ligorna
+   försvinner. (Hoppa över med `&awardAchievementsFirst=false`.)
+2. Varje liga sätts till `hidden = TRUE` – samma mjuka borttagning som en
+   ligaägare gör från UI:t.
+
+Vad som bevaras: medlemskap, chatthistorik, tips, poäng, utdelade achievements
+och placeringar. Ligorna slutar bara dyka upp i `/leagues/mine`, på
+leaderboard-flikarna och i chatt-widgeten.
+
+Så här ångrar du (en enskild liga eller alla):
+
+```sql
+UPDATE leagues SET hidden = FALSE WHERE id = <id>;
+```
+
+Obs: `POST /api/admin/cleanup-test-data` gömmer också ligor, men den raderar
+matcher, tips, achievements och notifikationer på vägen. Använd
+`archive-all` när det bara är ligorna som ska bort.
+
+### Steg 3: Nollställ den globala topplistan
+
+Den globala topplistan (fliken 🌍 Global) är en summa av alla tips någonsin, så
+utan gräns följer förra turneringens poäng med in i nästa. `APP_SEASON_START`
+(ISO-datumtid, t.ex. `2026-09-01T00:00`) gör att topplistan bara räknar matcher
+som startar den tidpunkten eller senare.
+
+- Inget raderas – äldre tips ligger kvar i databasen.
+- Profilsidans totalpoäng är fortsatt "all time" (karriärsiffra), liksom
+  achievements och placeringar.
+- Tom variabel = gamla beteendet (räkna allt).
+
+Sätt den till strax efter att förra turneringen tog slut, och flytta den framåt
+när nästa säsong ska nollställas.
+
+### Steg 4: Väcka appen inför nästa turnering
+
+1. `FOOTBALL_API_COMPETITION_ID` till rätt tävling (VM = 2000, PL = 2021).
+2. `FOOTBALL_API_ENABLED=true` och rotera `FOOTBALL_API_KEY` om den är gammal.
+3. `MATCH_STATUS_SCHEDULER_ENABLED=true`,
+   `LEAGUE_ACHIEVEMENT_SCHEDULER_ENABLED=true`.
+4. Intervallen till normal drift (se avsnittet ovan).
+5. `APP_SEASON_START` till turneringens start (eller töm den).
+6. `DB_POOL_MAX_SIZE=10`, höj `-Xmx` i `JAVA_OPTS` om många är inne samtidigt.
+7. `POST /api/admin/sync/fixtures` för att hämta in spelschemat.
+
 ## Övervakning
 
 Kontrollera loggarna för att se när schedulers körs:

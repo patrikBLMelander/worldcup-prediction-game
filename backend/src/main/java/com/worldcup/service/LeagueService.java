@@ -849,6 +849,23 @@ public class LeagueService {
 
         log.info("Successfully unhid league {}", leagueId);
     }
+
+    /**
+     * Archives every league at once (admin only, end of a tournament).
+     *
+     * Same soft delete as {@link #hideLeague(Long, User)}: memberships, chat,
+     * predictions and awarded achievements are all preserved, the leagues just
+     * stop showing up anywhere in the UI. Achievement state is left alone so
+     * placements already awarded stay awarded.
+     *
+     * @return how many leagues were archived
+     */
+    @Transactional
+    public int archiveAllLeagues() {
+        int archived = leagueRepository.archiveAllLeagues();
+        log.warn("Archived {} league(s) - they are now hidden from all user-facing lists", archived);
+        return archived;
+    }
 }
 
 

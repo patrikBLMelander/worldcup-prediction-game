@@ -22,6 +22,7 @@ import com.worldcup.repository.MatchRepository;
 import com.worldcup.repository.PredictionRepository;
 import com.worldcup.repository.UserAchievementRepository;
 import com.worldcup.repository.UserRepository;
+import com.worldcup.config.SeasonSettings;
 import com.worldcup.security.CurrentUser;
 import com.worldcup.service.PredictionService;
 import com.worldcup.service.RelativeScoringService;
@@ -54,6 +55,7 @@ public class UserController {
     private final MatchRepository matchRepository;
     private final AchievementRepository achievementRepository;
     private final UserAchievementRepository userAchievementRepository;
+    private final SeasonSettings seasonSettings;
 
     @GetMapping("/me")
     public ResponseEntity<UserProfileDTO> getMyProfile() {
@@ -74,9 +76,17 @@ public class UserController {
         return ResponseEntity.ok(profile);
     }
 
+    /**
+     * Global leaderboard. Scoped to the current season when
+     * {@code app.season.start} is configured, so a finished tournament's points
+     * don't follow us into the next one (see {@link SeasonSettings}).
+     */
     @GetMapping("/leaderboard")
     public ResponseEntity<List<LeaderboardEntryDTO>> getLeaderboard() {
-        List<Object[]> leaderboardData = predictionRepository.findLeaderboard();
+        LocalDateTime seasonStart = seasonSettings.getStart().orElse(null);
+        List<Object[]> leaderboardData = seasonStart != null
+                ? predictionRepository.findLeaderboardSince(seasonStart)
+                : predictionRepository.findLeaderboard();
         
         List<LeaderboardEntryDTO> leaderboard = leaderboardData.stream()
                 .map(row -> {
@@ -86,7 +96,9 @@ public class UserController {
                     User user = userRepository.findById(userId)
                             .orElseThrow(() -> new UserNotFoundException(userId));
                     
-                    long predictionCount = predictionRepository.findByUser(user).size();
+                    long predictionCount = seasonStart != null
+                            ? predictionRepository.countByUserSince(user, seasonStart)
+                            : predictionRepository.countByUser(user);
                     
                     return new LeaderboardEntryDTO(
                             userId,
