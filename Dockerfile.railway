@@ -1,0 +1,73 @@
+# Single-service build for Railway: Spring Boot backend + React frontend served
+# by nginx from ONE container, supervised by supervisord. This replaces the
+# previous two-service setup (separate backend + frontend services), removing an
+# always-on service so only one app service is billed (and it can sleep when
+# idle). Postgres is expected to be an external serverless database (e.g. Neon)
+# configured via SPRING_DATASOURCE_* env vars.
+
+# Stage 1: Build backend
+FROM maven:3.9-eclipse-temurin-17 AS backend-build
+WORKDIR /app/backend
+COPY backend/pom.xml .
+RUN mvn dependency:go-offline -B
+COPY backend/src ./src
+RUN mvn clean package -DskipTests
+
+# Stage 2: Build frontend (same origin: no VITE_API_BASE_URL, so it calls /api
+# and /ws on its own origin, which nginx proxies to the backend)
+FROM node:20-alpine AS frontend-build
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ .
+RUN npm run build
+
+# Stage 3: Final image with backend + nginx
+FROM eclipse-temurin:17-jre
+
+RUN apt-get update && \
+    apt-get install -y nginx supervisor && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# JVM options. Overridable so a resting deployment can cap heap (and therefore
+# billed memory) from Railway, e.g. JAVA_OPTS="-Xms64m -Xmx256m -XX:+UseSerialGC".
+ENV JAVA_OPTS=""
+
+# Backend jar
+COPY --from=backend-build /app/backend/target/*.jar app.jar
+
+# Frontend static build
+COPY --from=frontend-build /app/frontend/dist /usr/share/nginx/html
+
+# nginx config (complete file, replaces default)
+COPY nginx-railway.conf /etc/nginx/nginx.conf
+RUN rm -f /etc/nginx/sites-enabled/default
+
+# supervisord: run backend and nginx together
+RUN echo '[supervisord]' > /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'nodaemon=true' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo '' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo '[program:backend]' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'command=sh -c "exec java $JAVA_OPTS -jar /app/app.jar"' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'autostart=true' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'autorestart=true' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'stderr_logfile=/dev/stderr' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'stderr_logfile_maxbytes=0' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'stdout_logfile=/dev/stdout' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'stdout_logfile_maxbytes=0' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo '' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo '[program:nginx]' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'command=nginx -g "daemon off;"' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'autostart=true' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'autorestart=true' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'stderr_logfile=/dev/stderr' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'stderr_logfile_maxbytes=0' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'stdout_logfile=/dev/stdout' >> /etc/supervisor/conf.d/supervisord.conf && \
+    echo 'stdout_logfile_maxbytes=0' >> /etc/supervisor/conf.d/supervisord.conf
+
+EXPOSE 80
+
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
