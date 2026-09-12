@@ -18,3 +18,8 @@ docker-compose.override.yml
 # OS
 Thumbs.db
 
+# Database dumps are kept OUT of git — they contain user PII
+# (emails, password hashes, chat). Store them somewhere durable instead
+# (cloud / external drive). See db-backup/README.md.
+db-backup/*.sql
+

@@ -1,5 +1,10 @@
 # World Cup 2026 Prediction Game
 
+> ⚠️ **Appen är vilande (nedsläckt sedan 2026-09-12** för att spara kostnad).
+> All data finns kvar som en full databas-dump som förvaras **lokalt/utanför git**
+> (innehåller PII). Se **[`db-backup/README.md`](db-backup/README.md)** för var dumpen
+> finns och hur du väcker appen igen inför nästa EM/VM.
+
 A web application where friends can sign up and predict football World Cup 2026 game results.
 
 ## Project Structure
